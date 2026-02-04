@@ -5,6 +5,8 @@ type ToolCallLike = {
   name?: string;
 };
 
+import { normalizeToolName } from "./tool-policy.js";
+
 const TOOL_CALL_TYPES = new Set(["toolCall", "toolUse", "functionCall"]);
 
 type ToolCallBlock = {
@@ -36,7 +38,7 @@ function extractToolCallsFromAssistant(
     if (rec.type === "toolCall" || rec.type === "toolUse" || rec.type === "functionCall") {
       toolCalls.push({
         id: rec.id,
-        name: typeof rec.name === "string" ? rec.name.trim().toLowerCase() : undefined,
+        name: typeof rec.name === "string" ? normalizeToolName(rec.name) : undefined,
       });
     }
   }
@@ -128,9 +130,9 @@ export function repairToolCallInputs(messages: AgentMessage[]): ToolCallInputRep
       if (isToolCallBlock(block)) {
         const name = (block as { name?: unknown }).name;
         if (typeof name === "string") {
-          const sanitized = name.trim().toLowerCase();
+          const sanitized = normalizeToolName(name);
           if (sanitized !== name) {
-            nextContent.push({ ...block, name: sanitized } as any);
+            nextContent.push({ ...block, name: sanitized } as typeof block);
             changed = true;
             messageChanged = true;
             continue;

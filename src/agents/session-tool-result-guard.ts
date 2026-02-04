@@ -2,6 +2,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { SessionManager } from "@mariozechner/pi-coding-agent";
 import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import { makeMissingToolResult, sanitizeToolCallInputs } from "./session-transcript-repair.js";
+import { normalizeToolName } from "./tool-policy.js";
 
 type ToolCall = { id: string; name?: string };
 
@@ -23,7 +24,7 @@ function extractAssistantToolCalls(msg: Extract<AgentMessage, { role: "assistant
     if (rec.type === "toolCall" || rec.type === "toolUse" || rec.type === "functionCall") {
       toolCalls.push({
         id: rec.id,
-        name: typeof rec.name === "string" ? rec.name.trim().toLowerCase() : undefined,
+        name: typeof rec.name === "string" ? normalizeToolName(rec.name) : undefined,
       });
     }
   }
