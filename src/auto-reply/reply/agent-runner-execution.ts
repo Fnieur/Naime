@@ -161,10 +161,12 @@ export async function runAgentTurnWithFallback(params: {
         provider: params.followupRun.run.provider,
         model: params.followupRun.run.model,
         agentDir: params.followupRun.run.agentDir,
-        fallbacksOverride: resolveAgentModelFallbacksOverride(
-          params.followupRun.run.config,
-          resolveAgentIdFromSessionKey(params.followupRun.run.sessionKey),
-        ),
+        fallbacksOverride:
+          params.opts?.heartbeatFallbacksOverride ??
+          resolveAgentModelFallbacksOverride(
+            params.followupRun.run.config,
+            resolveAgentIdFromSessionKey(params.followupRun.run.sessionKey),
+          ),
         run: (provider, model) => {
           // Notify that model selection is complete (including after fallback).
           // This allows responsePrefix template interpolation with the actual model.
