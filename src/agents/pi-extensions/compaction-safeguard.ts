@@ -53,8 +53,18 @@ function hasImageContent(msg: AgentMessage): boolean {
 }
 
 function estimateImageDataBytes(data: string): number {
+  // Strip data URL prefix if present (e.g., "data:image/png;base64,")
+  let base64Data = data;
+  const dataUrlMatch = data.match(/^data:[^;]+;base64,/);
+  if (dataUrlMatch) {
+    base64Data = data.slice(dataUrlMatch[0].length);
+  }
+
+  // Remove padding characters and newlines which don't contribute to decoded size
+  const cleanData = base64Data.replace(/[=\s]/g, "");
+
   // Base64 encoding overhead is ~4/3, so actual bytes = chars * 3/4
-  return Math.round((data.length * 3) / 4);
+  return Math.round((cleanData.length * 3) / 4);
 }
 
 function createImagePlaceholder(
@@ -63,7 +73,13 @@ function createImagePlaceholder(
   const sizeBytes = estimateImageDataBytes(block.data);
   const sizeKb = Math.round(sizeBytes / 1024);
   const mimeType = block.mimeType ?? "image";
+
+  // Preserve safe metadata fields from the original block, excluding data
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { data: _data, type: _type, text: _text, ...metadata } = block;
+
   return {
+    ...metadata,
     type: "text",
     text: `[Image omitted during compaction: ${mimeType}, ~${sizeKb}KB]`,
   };
@@ -349,8 +365,14 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       // Strip images from older messages before summarization to reduce payload size.
       // This addresses the issue where accumulated screenshots cause 413 Request Entity
       // Too Large errors by replacing old image data with lightweight text placeholders.
+      //
+      // Important: We must strip from BOTH messagesToSummarize AND turnPrefixMessages,
+      // with the "keep N most recent" logic applied across the combined list (since
+      // turnPrefixMessages come after messagesToSummarize chronologically).
       const allMessagesForImages = [...messagesToSummarize, ...turnPrefixMessages];
       const imageStats = countImagesInMessages(allMessagesForImages);
+
+      let strippedTurnPrefixMessages = turnPrefixMessages;
 
       if (imageStats.count > 0) {
         const imagesMb = (imageStats.totalBytes / 1024 / 1024).toFixed(2);
@@ -359,10 +381,15 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
             `Stripping old images, keeping ${KEEP_RECENT_IMAGES_COUNT} recent.`,
         );
 
-        const strippedResult = stripOldImagesFromMessages(messagesToSummarize, {
+        // Strip images across the combined list to ensure "keep N most recent" applies globally
+        const strippedResult = stripOldImagesFromMessages(allMessagesForImages, {
           keepRecentCount: KEEP_RECENT_IMAGES_COUNT,
         });
-        messagesToSummarize = strippedResult.messages;
+
+        // Re-split the stripped messages back into the two arrays
+        const splitPoint = messagesToSummarize.length;
+        messagesToSummarize = strippedResult.messages.slice(0, splitPoint);
+        strippedTurnPrefixMessages = strippedResult.messages.slice(splitPoint);
 
         if (strippedResult.strippedCount > 0) {
           const strippedMb = (strippedResult.strippedBytes / 1024 / 1024).toFixed(2);
@@ -382,7 +409,8 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
 
       if (tokensBefore !== undefined) {
         const summarizableTokens =
-          estimateMessagesTokens(messagesToSummarize) + estimateMessagesTokens(turnPrefixMessages);
+          estimateMessagesTokens(messagesToSummarize) +
+          estimateMessagesTokens(strippedTurnPrefixMessages);
         const newContentTokens = Math.max(0, Math.floor(tokensBefore - summarizableTokens));
         // Apply SAFETY_MARGIN so token underestimates don't trigger unnecessary pruning
         const maxHistoryTokens = Math.floor(contextWindowTokens * maxHistoryShare * SAFETY_MARGIN);
@@ -439,7 +467,7 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       }
 
       // Use adaptive chunk ratio based on message sizes
-      const allMessages = [...messagesToSummarize, ...turnPrefixMessages];
+      const allMessages = [...messagesToSummarize, ...strippedTurnPrefixMessages];
       const adaptiveRatio = computeAdaptiveChunkRatio(allMessages, contextWindowTokens);
       const maxChunkTokens = Math.max(1, Math.floor(contextWindowTokens * adaptiveRatio));
       const reserveTokens = Math.max(1, Math.floor(preparation.settings.reserveTokens));
@@ -461,9 +489,9 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       });
 
       let summary = historySummary;
-      if (preparation.isSplitTurn && turnPrefixMessages.length > 0) {
+      if (preparation.isSplitTurn && strippedTurnPrefixMessages.length > 0) {
         const prefixSummary = await summarizeInStages({
-          messages: turnPrefixMessages,
+          messages: strippedTurnPrefixMessages,
           model,
           apiKey,
           signal,
@@ -517,6 +545,8 @@ export const __testing = {
   stripOldImagesFromMessages,
   countImagesInMessages,
   replaceImagesWithPlaceholders,
+  createImagePlaceholder,
+  estimateImageDataBytes,
   hasImageContent,
   KEEP_RECENT_IMAGES_COUNT,
 } as const;
