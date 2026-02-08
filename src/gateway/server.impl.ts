@@ -71,6 +71,11 @@ import { createGatewayReloadHandlers } from "./server-reload-handlers.js";
 import { resolveGatewayRuntimeConfig } from "./server-runtime-config.js";
 import { createGatewayRuntimeState } from "./server-runtime-state.js";
 import { resolveSessionKeyForRun } from "./server-session-key.js";
+import {
+  buildGatewaySpoolService,
+  startGatewaySpoolWatcher,
+  stopGatewaySpoolWatcher,
+} from "./server-spool.js";
 import { logGatewayStartup } from "./server-startup-log.js";
 import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
@@ -97,6 +102,7 @@ const logChannels = log.child("channels");
 const logBrowser = log.child("browser");
 const logHealth = log.child("health");
 const logCron = log.child("cron");
+const logSpool = log.child("spool");
 const logReload = log.child("reload");
 const logHooks = log.child("hooks");
 const logPlugins = log.child("plugins");
@@ -402,6 +408,12 @@ export async function startGatewayServer(
   });
   let { cron, storePath: cronStorePath } = cronState;
 
+  let spoolState = buildGatewaySpoolService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+
   const channelManager = createChannelManager({
     loadConfig,
     channelLogs,
@@ -530,6 +542,10 @@ export async function startGatewayServer(
     })().catch((err) => log.error(`Delivery recovery failed: ${String(err)}`));
   }
 
+  void startGatewaySpoolWatcher(spoolState).catch((err) =>
+    logSpool.error(`failed to start: ${String(err)}`),
+  );
+
   const execApprovalManager = new ExecApprovalManager();
   const execApprovalForwarder = createExecApprovalForwarder();
   const execApprovalHandlers = createExecApprovalHandlers(execApprovalManager, {
@@ -655,6 +671,7 @@ export async function startGatewayServer(
             hooksConfig,
             heartbeatRunner,
             cronState,
+            spoolState,
             browserControl,
           }),
           setState: (nextState) => {
@@ -663,6 +680,7 @@ export async function startGatewayServer(
             cronState = nextState.cronState;
             cron = cronState.cron;
             cronStorePath = cronState.storePath;
+            spoolState = nextState.spoolState;
             browserControl = nextState.browserControl;
           },
           startChannel,
@@ -671,6 +689,7 @@ export async function startGatewayServer(
           logBrowser,
           logChannels,
           logCron,
+          logSpool,
           logReload,
         });
 
@@ -696,6 +715,11 @@ export async function startGatewayServer(
     stopChannel,
     pluginServices,
     cron,
+    spool: {
+      stop: async () => {
+        await stopGatewaySpoolWatcher(spoolState);
+      },
+    },
     heartbeatRunner,
     nodePresenceTimers,
     broadcast,
