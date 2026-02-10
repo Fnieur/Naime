@@ -872,6 +872,7 @@ export async function runEmbeddedAttempt(
         // Run before_prompt_build hooks to allow plugins to inject prompt context.
         // Legacy compatibility: before_agent_start is also checked for context fields.
         let effectivePrompt = params.prompt;
+        let effectiveSystemPrompt = systemPromptText;
         const hookCtx = {
           agentId: hookAgentId,
           sessionKey: params.sessionKey,
@@ -899,6 +900,7 @@ export async function runEmbeddedAttempt(
                 {
                   prompt: params.prompt,
                   messages: activeSession.messages,
+                  systemPrompt: systemPromptText,
                 },
                 hookCtx,
               )
@@ -916,6 +918,11 @@ export async function runEmbeddedAttempt(
             .join("\n\n"),
         };
         {
+          if (hookResult?.systemPrompt) {
+            activeSession.agent.setSystemPrompt(hookResult.systemPrompt);
+            effectiveSystemPrompt = hookResult.systemPrompt;
+            log.debug(`hooks: replaced system prompt (${hookResult.systemPrompt.length} chars)`);
+          }
           if (hookResult?.prependContext) {
             effectivePrompt = `${hookResult.prependContext}\n\n${params.prompt}`;
             log.debug(
@@ -927,6 +934,7 @@ export async function runEmbeddedAttempt(
         log.debug(`embedded run prompt start: runId=${params.runId} sessionId=${params.sessionId}`);
         cacheTrace?.recordStage("prompt:before", {
           prompt: effectivePrompt,
+          system: effectiveSystemPrompt,
           messages: activeSession.messages,
         });
 
