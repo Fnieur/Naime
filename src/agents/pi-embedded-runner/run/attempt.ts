@@ -1132,7 +1132,7 @@ export async function runEmbeddedAttempt(
         }
 
         // Bridge agent_end to internal/workspace hooks (fire-and-forget)
-        void triggerAgentEndHook({
+        triggerAgentEndHook({
           messages: messagesSnapshot,
           success: !aborted && !promptError,
           error: promptError ? describeUnknownError(promptError) : undefined,
@@ -1140,6 +1140,8 @@ export async function runEmbeddedAttempt(
           agentId: hookAgentId,
           sessionKey: params.sessionKey,
           workspaceDir: params.workspaceDir,
+        }).catch((err) => {
+          log.warn(`agent_end internal hook failed: ${err}`);
         });
       } finally {
         clearTimeout(abortTimer);
