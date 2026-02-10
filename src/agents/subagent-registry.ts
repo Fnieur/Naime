@@ -644,6 +644,7 @@ export function addSubagentRunForTests(entry: SubagentRunRecord) {
 }
 
 export function releaseSubagentRun(runId: string) {
+  cancelPendingCleanupTimer(runId);
   const didDelete = subagentRuns.delete(runId);
   if (didDelete) {
     persistSubagentRuns();
