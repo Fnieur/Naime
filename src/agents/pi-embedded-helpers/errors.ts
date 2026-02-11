@@ -599,6 +599,7 @@ const ERROR_PATTERNS = {
     "deadline exceeded",
     "context deadline exceeded",
     /without sending (?:any )?chunks?/i,
+    "stream ended before first chunk",
   ],
   billing: [
     /["']?(?:status|code)["']?\s*[:=]\s*402\b|\bhttp\s*402\b|\berror(?:\s+code)?\s*[:=]?\s*402\b|\b(?:got|returned|received)\s+(?:a\s+)?402\b|^\s*402\s+payment/i,
