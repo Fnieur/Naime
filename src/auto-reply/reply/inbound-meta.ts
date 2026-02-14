@@ -1,4 +1,6 @@
+import type { AgentDefaultsConfig } from "../../config/types.agent-defaults.js";
 import type { TemplateContext } from "../templating.js";
+import { resolveUserTimezone } from "../../agents/date-time.js";
 import { normalizeChatType } from "../../channels/chat-type.js";
 import { resolveSenderLabel } from "../../channels/sender-label.js";
 
@@ -10,7 +12,152 @@ function safeTrim(value: unknown): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export function buildInboundMetaSystemPrompt(ctx: TemplateContext): string {
+// ── Inbound time formatting ───────────────────────────────────────────
+
+const DEFAULT_SKIP_MS = 90_000; // 90 seconds
+const DEFAULT_MAX_GAP_MS = 900_000; // 15 minutes
+const DEFAULT_DATE_MS = 7_200_000; // 2 hours
+
+export type InboundTimeParams = {
+  /** Agent defaults config (for timezone + inbound time settings). */
+  agentDefaults?: AgentDefaultsConfig;
+  /** Whether this is the first message in the session. */
+  isFirstMessage: boolean;
+  /** Timestamp (ms) when the last `t` field was sent, or undefined if never. */
+  lastTimeSentAt?: number;
+  /** Timestamp (ms) when the last full-date `t` field was sent, or undefined if never. */
+  lastDateSentAt?: number;
+};
+
+export type InboundTimeResult = {
+  /** The `t` value to include, or undefined to omit. */
+  value: string | undefined;
+  /** Whether a full date was included (for tracking). */
+  isFullDate: boolean;
+};
+
+/**
+ * Format a time-only string: `7:13am` (lowercase am/pm, no space, no leading zero).
+ */
+export function formatInboundTime(date: Date, timeZone: string): string {
+  // Use Intl to get the hour/minute in the correct timezone
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+
+  let hour = "";
+  let minute = "";
+  let dayPeriod = "";
+  for (const part of parts) {
+    if (part.type === "hour") {
+      hour = part.value;
+    }
+    if (part.type === "minute") {
+      minute = part.value;
+    }
+    if (part.type === "dayPeriod") {
+      dayPeriod = part.value.toLowerCase();
+    }
+  }
+  return `${hour}:${minute}${dayPeriod}`;
+}
+
+/**
+ * Format a full date+time string: `Sat 15 Feb 7:13am NZDT`
+ */
+export function formatInboundDateTime(date: Date, timeZone: string): string {
+  const time = formatInboundTime(date, timeZone);
+
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(date);
+
+  const dayParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    day: "numeric",
+    month: "short",
+  }).formatToParts(date);
+
+  let day = "";
+  let month = "";
+  for (const part of dayParts) {
+    if (part.type === "day") {
+      day = part.value;
+    }
+    if (part.type === "month") {
+      month = part.value;
+    }
+  }
+
+  // Get timezone abbreviation
+  const tzName = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "short",
+  }).formatToParts(date);
+  let tz = "";
+  for (const part of tzName) {
+    if (part.type === "timeZoneName") {
+      tz = part.value;
+    }
+  }
+
+  return `${weekday} ${day} ${month} ${time} ${tz}`;
+}
+
+/**
+ * Resolve whether to include a `t` field and what format.
+ */
+export function resolveInboundTime(
+  currentTimestamp: number,
+  params: InboundTimeParams,
+): InboundTimeResult {
+  const cfg = params.agentDefaults;
+
+  // Feature disabled
+  if (cfg?.envelopeInboundTime === "off") {
+    return { value: undefined, isFullDate: false };
+  }
+
+  const skipMs = cfg?.envelopeInboundTimeSkipMs ?? DEFAULT_SKIP_MS;
+  const maxGapMs = cfg?.envelopeInboundTimeMaxGapMs ?? DEFAULT_MAX_GAP_MS;
+  const dateMs = cfg?.envelopeInboundTimeDateMs ?? DEFAULT_DATE_MS;
+  const timeZone = resolveUserTimezone(cfg?.userTimezone);
+
+  const date = new Date(currentTimestamp);
+  const gapSinceLastTime =
+    params.lastTimeSentAt != null ? currentTimestamp - params.lastTimeSentAt : undefined;
+  const gapSinceLastDate =
+    params.lastDateSentAt != null ? currentTimestamp - params.lastDateSentAt : undefined;
+
+  // First message or gap >= dateMs → full date+time
+  if (params.isFirstMessage || gapSinceLastDate == null || gapSinceLastDate >= dateMs) {
+    return { value: formatInboundDateTime(date, timeZone), isFullDate: true };
+  }
+
+  // Gap >= skipMs → time only
+  if (gapSinceLastTime == null || gapSinceLastTime >= skipMs) {
+    return { value: formatInboundTime(date, timeZone), isFullDate: false };
+  }
+
+  // maxGap override: if too long without any timestamp, include time-only
+  if (gapSinceLastTime >= maxGapMs) {
+    return { value: formatInboundTime(date, timeZone), isFullDate: false };
+  }
+
+  // Rapid-fire: omit
+  return { value: undefined, isFullDate: false };
+}
+
+// ── Inbound meta prompt builder ───────────────────────────────────────
+
+export function buildInboundMetaSystemPrompt(
+  ctx: TemplateContext,
+  timeParams?: InboundTimeParams,
+): string {
   const chatType = normalizeChatType(ctx.ChatType);
   const isDirect = !chatType || chatType === "direct";
   const messageId = safeTrim(ctx.MessageSid);
@@ -18,10 +165,16 @@ export function buildInboundMetaSystemPrompt(ctx: TemplateContext): string {
   const replyToId = safeTrim(ctx.ReplyToId);
   const chatId = safeTrim(ctx.OriginatingTo);
 
+  // Resolve readable timestamp for the `t` field.
+  const timeResult = timeParams
+    ? resolveInboundTime(ctx.Timestamp ?? Date.now(), timeParams)
+    : undefined;
+
   // Keep system metadata strictly free of attacker-controlled strings (sender names, group subjects, etc.).
   // Those belong in the user-role "untrusted context" blocks.
   const payload = {
     schema: "openclaw.inbound_meta.v1",
+    ...(timeResult?.value ? { t: timeResult.value } : {}),
     message_id: messageId,
     message_id_full: messageIdFull && messageIdFull !== messageId ? messageIdFull : undefined,
     chat_id: chatId,
