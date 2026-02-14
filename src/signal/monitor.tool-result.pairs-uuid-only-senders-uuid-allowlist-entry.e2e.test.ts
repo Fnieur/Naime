@@ -72,7 +72,7 @@ beforeEach(() => {
   config = {
     messages: { responsePrefix: "PFX" },
     channels: {
-      signal: { autoStart: false, dmPolicy: "open", allowFrom: ["*"] },
+      signal: { autoStart: false, dmPolicy: "open", allowFrom: ["*"], apiMode: "native" },
     },
   };
   sendMock.mockReset().mockResolvedValue(undefined);

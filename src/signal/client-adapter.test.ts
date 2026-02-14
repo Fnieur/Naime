@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
+  adapterRpcRequest,
   detectSignalApiMode,
   sendMessageAdapter,
   sendTypingAdapter,
@@ -669,6 +670,29 @@ describe("sendMessageAdapter - additional cases", () => {
     expect(mockContainerSendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         recipients: [],
+      }),
+    );
+  });
+
+  it("uses username targets in container mode when recipient is absent", async () => {
+    setApiMode("container");
+    mockContainerSendMessage.mockResolvedValue({ timestamp: 1700000000000 });
+
+    await adapterRpcRequest(
+      "send",
+      {
+        account: "+14259798283",
+        message: "Hello username",
+        username: ["alice.01"],
+      },
+      {
+        baseUrl: "http://localhost:8080",
+      },
+    );
+
+    expect(mockContainerSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipients: ["alice.01"],
       }),
     );
   });

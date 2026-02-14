@@ -100,10 +100,17 @@ async function handleContainerRpc<T>(
   switch (method) {
     case "send": {
       const recipients = (params.recipient as string[] | undefined) ?? [];
+      const usernames = (params.username as string[] | undefined) ?? [];
       const groupId = params.groupId as string | undefined;
       const formattedGroupId = groupId ? formatGroupIdForContainer(groupId) : undefined;
       const finalRecipients =
-        recipients.length > 0 ? recipients : formattedGroupId ? [formattedGroupId] : [];
+        recipients.length > 0
+          ? recipients
+          : usernames.length > 0
+            ? usernames
+            : formattedGroupId
+              ? [formattedGroupId]
+              : [];
 
       // Convert text-style from native format to container format
       const textStylesRaw = params["text-style"] as string[] | undefined;
