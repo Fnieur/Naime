@@ -491,6 +491,13 @@ export const buildTelegramMessageContext = async ({
           : null,
       });
 
+      // Prepare sender/conversation labels early for Silent Ingest
+      const groupLabel = isGroup ? buildGroupLabel(msg, chatId, resolvedThreadId) : undefined;
+      const senderName = buildSenderName(msg);
+      const conversationLabel = isGroup
+        ? (groupLabel ?? `group:${chatId}`)
+        : buildSenderLabel(msg, senderId || chatId);
+
       // Silent ingest: run hooks on non-mentioned messages
       const ingestEnabled = topicConfig?.ingest ?? groupConfig?.ingest;
       if (ingestEnabled && rawBody && rawBody.trim().length > 0) {
@@ -608,11 +615,6 @@ export const buildTelegramMessageContext = async ({
         forwardOrigin.date ? ` at ${new Date(forwardOrigin.date * 1000).toISOString()}` : ""
       }]\n`
     : "";
-  const groupLabel = isGroup ? buildGroupLabel(msg, chatId, resolvedThreadId) : undefined;
-  const senderName = buildSenderName(msg);
-  const conversationLabel = isGroup
-    ? (groupLabel ?? `group:${chatId}`)
-    : buildSenderLabel(msg, senderId || chatId);
   const storePath = resolveStorePath(cfg.session?.store, {
     agentId: route.agentId,
   });
