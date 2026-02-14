@@ -9,6 +9,7 @@ import type { DmConfig } from "./types.messages.js";
 
 export type SignalReactionNotificationMode = "off" | "own" | "all" | "allowlist";
 export type SignalReactionLevel = "off" | "ack" | "minimal" | "extensive";
+export type SignalApiMode = "auto" | "native" | "container";
 
 export type SignalAccountConfig = {
   /** Optional display name for this account (used in CLI/UI lists). */
@@ -25,6 +26,13 @@ export type SignalAccountConfig = {
   account?: string;
   /** Optional full base URL for signal-cli HTTP daemon. */
   httpUrl?: string;
+  /**
+   * Signal API mode:
+   * - "auto" (default): Auto-detect based on available endpoints
+   * - "native": Use native signal-cli with JSON-RPC + SSE (/api/v1/rpc, /api/v1/events)
+   * - "container": Use bbernhard/signal-cli-rest-api with REST + WebSocket (/v2/send, /v1/receive/{account})
+   */
+  apiMode?: SignalApiMode;
   /** HTTP host for signal-cli daemon (default 127.0.0.1). */
   httpHost?: string;
   /** HTTP port for signal-cli daemon (default 8080). */

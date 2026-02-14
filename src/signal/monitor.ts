@@ -9,7 +9,7 @@ import { saveMediaBuffer } from "../media/store.js";
 import { createNonExitingRuntime, type RuntimeEnv } from "../runtime.js";
 import { normalizeE164 } from "../utils.js";
 import { resolveSignalAccount } from "./accounts.js";
-import { signalCheck, signalRpcRequest } from "./client.js";
+import { adapterRpcRequest as signalRpcRequest, checkAdapter } from "./client-adapter.js";
 import { spawnSignalDaemon } from "./daemon.js";
 import { isSignalSenderAllowed, type resolveSignalSender } from "./identity.js";
 import { createSignalEventHandler } from "./monitor/event-handler.js";
@@ -159,7 +159,7 @@ async function waitForSignalDaemonReady(params: {
     abortSignal: params.abortSignal,
     runtime: params.runtime,
     check: async () => {
-      const res = await signalCheck(params.baseUrl, 1000);
+      const res = await checkAdapter(params.baseUrl, undefined, 1000);
       if (res.ok) {
         return { ok: true };
       }
@@ -300,12 +300,19 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
   const sendReadReceipts = Boolean(opts.sendReadReceipts ?? accountInfo.config.sendReadReceipts);
 
   const autoStart = opts.autoStart ?? accountInfo.config.autoStart ?? !accountInfo.config.httpUrl;
+  const configuredApiMode = cfg.channels?.signal?.apiMode ?? "auto";
   const startupTimeoutMs = Math.min(
     120_000,
     Math.max(1_000, opts.startupTimeoutMs ?? accountInfo.config.startupTimeoutMs ?? 30_000),
   );
   const readReceiptsViaDaemon = Boolean(autoStart && sendReadReceipts);
   let daemonHandle: ReturnType<typeof spawnSignalDaemon> | null = null;
+
+  if (autoStart && configuredApiMode === "container") {
+    throw new Error(
+      "channels.signal.autoStart=true is incompatible with channels.signal.apiMode=container",
+    );
+  }
 
   if (autoStart) {
     const cliPath = opts.cliPath ?? accountInfo.config.cliPath ?? "signal-cli";
