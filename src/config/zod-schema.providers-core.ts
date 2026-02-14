@@ -327,6 +327,12 @@ export const DiscordAccountSchema = z
       .strict()
       .optional(),
     ui: DiscordUiSchema,
+    slashCommand: z
+      .object({
+        ephemeral: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     intents: z
       .object({
         presence: z.boolean().optional(),

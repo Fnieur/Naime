@@ -329,6 +329,10 @@ Use `bindings[].match.roles` to route Discord guild members to different agents 
 
 See [Slash commands](/tools/slash-commands) for command catalog and behavior.
 
+Default slash command settings:
+
+- `ephemeral: true`
+
 ## Feature details
 
 <AccordionGroup>
@@ -680,7 +684,7 @@ High-signal Discord fields:
 
 - startup/auth: `enabled`, `token`, `accounts.*`, `allowBots`
 - policy: `groupPolicy`, `dm.*`, `guilds.*`, `guilds.*.channels.*`
-- command: `commands.native`, `commands.useAccessGroups`, `configWrites`
+- command: `commands.native`, `commands.useAccessGroups`, `configWrites`, `slashCommand.*`
 - reply/history: `replyToMode`, `historyLimit`, `dmHistoryLimit`, `dms.*.historyLimit`
 - delivery: `textChunkLimit`, `chunkMode`, `maxLinesPerMessage`
 - media/retry: `mediaMaxMb`, `retry`
