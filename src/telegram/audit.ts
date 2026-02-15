@@ -1,7 +1,9 @@
 import type { TelegramGroupConfig } from "../config/types.js";
 import { isRecord } from "../utils.js";
+import { getTelegramApiBase } from "./api-base.js";
 
-const TELEGRAM_API_BASE = "https://api.telegram.org";
+// Lazy: must not cache at module load — env vars aren't applied yet.
+const telegramApiBase = () => getTelegramApiBase();
 
 export type TelegramGroupMembershipAuditEntry = {
   chatId: string;
@@ -91,7 +93,7 @@ export async function auditTelegramGroupMembership(params: {
     ? (await import("./proxy.js")).makeProxyFetch(params.proxyUrl)
     : fetch;
   const { fetchWithTimeout } = await import("../utils/fetch-timeout.js");
-  const base = `${TELEGRAM_API_BASE}/bot${token}`;
+  const base = `${telegramApiBase()}/bot${token}`;
   const groups: TelegramGroupMembershipAuditEntry[] = [];
 
   for (const chatId of params.groupIds) {

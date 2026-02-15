@@ -131,6 +131,8 @@ export const TelegramAccountSchemaBase = z
       })
       .strict()
       .optional(),
+    apiRoot: z.string().url().optional(),
+    localApiDataDir: z.string().optional(),
     proxy: z.string().optional(),
     webhookUrl: z.string().optional(),
     webhookSecret: z.string().optional().register(sensitive),
