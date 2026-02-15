@@ -145,6 +145,7 @@ describe("e2e compaction-recall", () => {
         vectorPersist: true,
       });
       await archiveCompactedMessages(store, PAYMENT_MESSAGES, { redaction: false });
+      await store.flush(); // Ensure all JSONL writes complete before restart
       store.persistVectorsNow(); // Force sync persist
 
       const ks = new KnowledgeStore(knowledgePath);

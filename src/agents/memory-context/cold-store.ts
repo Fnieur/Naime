@@ -47,6 +47,11 @@ export class ColdStore {
     return this.appendChain;
   }
 
+  /** Wait for all pending appends to complete. */
+  async flush(): Promise<void> {
+    await this.appendChain;
+  }
+
   async *loadAll(): AsyncGenerator<ColdStoreSegment> {
     await this.ensureReady();
 

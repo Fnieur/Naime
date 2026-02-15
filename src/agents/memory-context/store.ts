@@ -354,6 +354,11 @@ export class WarmStore {
     return segment;
   }
 
+  /** Wait for all pending cold-store writes to complete. */
+  async flush(): Promise<void> {
+    await this.cold.flush();
+  }
+
   /**
    * Check if content is already archived (by dedup key).
    */
