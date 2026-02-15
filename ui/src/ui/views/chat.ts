@@ -15,6 +15,15 @@ import { detectTextDirection } from "../text-direction.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
 import "../components/resizable-divider.ts";
 
+// Mobile detection - touch devices without fine pointer (phones/tablets)
+const isMobileDevice = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(pointer: coarse)").matches &&
+    !window.matchMedia("(pointer: fine)").matches
+  );
+};
+
 export type CompactionIndicatorStatus = {
   active: boolean;
   startedAt: number | null;
@@ -199,10 +208,13 @@ export function renderChat(props: ChatProps) {
   };
 
   const hasAttachments = (props.attachments?.length ?? 0) > 0;
+  const isMobile = isMobileDevice();
   const composePlaceholder = props.connected
     ? hasAttachments
       ? "Add a message or paste more images..."
-      : "Message (↩ to send, Shift+↩ for line breaks, paste images)"
+      : isMobile
+        ? "Message (tap Send to send)"
+        : "Message (↩ to send, Shift+↩ for line breaks, paste images)"
     : "Connect to the gateway to start chatting…";
 
   const splitRatio = props.splitRatio ?? 0.6;
@@ -385,9 +397,11 @@ export function renderChat(props: ChatProps) {
                 if (e.isComposing || e.keyCode === 229) {
                   return;
                 }
-                if (e.shiftKey) {
+                // On mobile: Enter = newline (no Shift key available), use Send button
+                // On desktop: Enter = send, Shift+Enter = newline
+                if (isMobile || e.shiftKey) {
                   return;
-                } // Allow Shift+Enter for line breaks
+                }
                 if (!props.connected) {
                   return;
                 }
