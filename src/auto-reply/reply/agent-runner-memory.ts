@@ -22,7 +22,7 @@ import {
   resolveMemoryFlushSettings,
   shouldRunMemoryFlush,
 } from "./memory-flush.js";
-import { incrementCompactionCount } from "./session-updates.js";
+import { incrementRunCompactionCount } from "./session-run-accounting.js";
 
 export async function runMemoryFlushIfNeeded(params: {
   cfg: OpenClawConfig;
@@ -89,6 +89,7 @@ export async function runMemoryFlushIfNeeded(params: {
     });
   }
   let memoryCompactionCompleted = false;
+  let compactionStats: { tokensBefore?: number; tokensAfter?: number } | undefined;
   const flushSystemPrompt = [
     params.followupRun.run.extraSystemPrompt,
     memoryFlushSettings.systemPrompt,
@@ -154,6 +155,15 @@ export async function runMemoryFlushIfNeeded(params: {
             if (evt.stream === "compaction") {
               const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
               const willRetry = Boolean(evt.data.willRetry);
+              const rawBefore = evt.data.tokensBefore ?? evt.data.result?.tokensBefore;
+              const rawAfter = evt.data.tokensAfter ?? evt.data.result?.tokensAfter;
+              const tokensBefore =
+                typeof rawBefore === "number" && rawBefore > 0 ? rawBefore : undefined;
+              const tokensAfter =
+                typeof rawAfter === "number" && rawAfter > 0 ? rawAfter : undefined;
+              if (tokensBefore != null || tokensAfter != null) {
+                compactionStats = { tokensBefore, tokensAfter };
+              }
               if (phase === "end" && !willRetry) {
                 memoryCompactionCompleted = true;
               }
@@ -167,11 +177,12 @@ export async function runMemoryFlushIfNeeded(params: {
       (params.sessionKey ? activeSessionStore?.[params.sessionKey]?.compactionCount : 0) ??
       0;
     if (memoryCompactionCompleted) {
-      const nextCount = await incrementCompactionCount({
+      const nextCount = await incrementRunCompactionCount({
         sessionEntry: activeSessionEntry,
         sessionStore: activeSessionStore,
         sessionKey: params.sessionKey,
         storePath: params.storePath,
+        tokensAfter: compactionStats?.tokensAfter,
       });
       if (typeof nextCount === "number") {
         memoryFlushCompactionCount = nextCount;
