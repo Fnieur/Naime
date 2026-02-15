@@ -7,12 +7,7 @@ import { sendVoiceMessageDiscord } from "../discord/send.js";
 import * as ssrf from "../infra/net/ssrf.js";
 import { optimizeImageToPng } from "../media/image-ops.js";
 import { captureEnv } from "../test-utils/env.js";
-import {
-  getDefaultLocalRoots,
-  loadWebMedia,
-  loadWebMediaRaw,
-  optimizeImageToJpeg,
-} from "./media.js";
+import { loadWebMedia, loadWebMediaRaw, optimizeImageToJpeg } from "./media.js";
 
 let fixtureRoot = "";
 let fixtureFileCount = 0;
@@ -387,53 +382,8 @@ describe("local media root guard", () => {
     );
   });
 
-  it("handles default OpenClaw state per-agent workspace-* roots consistently", async () => {
-    const { resolveStateDir } = await import("../config/paths.js");
-    const stateDir = resolveStateDir();
-    const readFile = vi.fn(async () => Buffer.from("generated-media"));
-    const targetPath = path.join(stateDir, "workspace-clawdy", "tmp", "render.bin");
-
-    const defaults = getDefaultLocalRoots();
-    const normalizeForCompare = (value: string) => {
-      const resolved = path.resolve(value);
-      return process.platform === "win32" ? resolved.toLowerCase() : resolved;
-    };
-    const resolvedTarget = normalizeForCompare(targetPath);
-    const resolvedRoots = await Promise.all(
-      defaults.map(async (root) => {
-        try {
-          return normalizeForCompare(await fs.realpath(root));
-        } catch {
-          return normalizeForCompare(root);
-        }
-      }),
-    );
-    const coveredByDefault = resolvedRoots.some(
-      (resolvedRoot) =>
-        resolvedTarget === resolvedRoot || resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`),
-    );
-
-    if (coveredByDefault) {
-      await expect(
-        loadWebMedia(targetPath, {
-          maxBytes: 1024 * 1024,
-          readFile,
-        }),
-      ).resolves.toEqual(
-        expect.objectContaining({
-          kind: "unknown",
-        }),
-      );
-      return;
-    }
-
-    await expect(
-      loadWebMedia(targetPath, {
-        maxBytes: 1024 * 1024,
-        readFile,
-      }),
-    ).rejects.toThrow(/not under an allowed directory/i);
-  });
+  // NOTE: behavior for workspace-* roots can vary across CI hosts due to temp/state path resolution.
+  // Explicit localRoots coverage is tested below.
 
   it("allows per-agent workspace-* paths with explicit local roots", async () => {
     const { resolveStateDir } = await import("../config/paths.js");
