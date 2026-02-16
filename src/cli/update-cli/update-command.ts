@@ -19,7 +19,7 @@ import {
 } from "../../infra/update-check.js";
 import {
   cleanupGlobalRenameDirs,
-  globalInstallArgs,
+  globalInstallConfig,
   resolveGlobalPackageRoot,
 } from "../../infra/update-global.js";
 import { runGatewayUpdate, type UpdateRunResult } from "../../infra/update-runner.js";
@@ -166,9 +166,11 @@ async function runPackageInstallUpdate(params: {
     });
   }
 
+  const install = globalInstallConfig(manager, `${packageName}@${params.tag}`);
   const updateStep = await runUpdateStep({
     name: "global update",
-    argv: globalInstallArgs(manager, `${packageName}@${params.tag}`),
+    argv: install.argv,
+    cwd: install.cwd,
     timeoutMs: params.timeoutMs,
     progress: params.progress,
   });
@@ -258,10 +260,11 @@ async function runGitUpdate(params: {
       installKind: params.installKind,
       timeoutMs: effectiveTimeout,
     });
+    const globalInstall = globalInstallConfig(manager, updateRoot);
     const installStep = await runUpdateStep({
       name: "global install",
-      argv: globalInstallArgs(manager, updateRoot),
-      cwd: updateRoot,
+      argv: globalInstall.argv,
+      cwd: globalInstall.cwd,
       timeoutMs: effectiveTimeout,
       progress: params.progress,
     });
