@@ -119,13 +119,13 @@ function resolveDirentKind(entry: fs.Dirent, fullPath: string): {
   let isFile = entry.isFile();
   let isDirectory = entry.isDirectory();
 
-  if (!isFile && !isDirectory && entry.isSymbolicLink()) {
+  if (!isFile && !isDirectory) {
     try {
       const stats = fs.statSync(fullPath);
       isFile = stats.isFile();
       isDirectory = stats.isDirectory();
     } catch {
-      // Broken symlink or inaccessible target; keep defaults.
+      // Broken symlink, inaccessible target, or unknown dirent type.
     }
   }
 

@@ -18,6 +18,18 @@ function symlinkDir(target: string, linkPath: string) {
   fs.symlinkSync(target, linkPath, process.platform === "win32" ? "junction" : "dir");
 }
 
+function symlinkFile(target: string, linkPath: string): boolean {
+  try {
+    fs.symlinkSync(target, linkPath, "file");
+    return true;
+  } catch (err) {
+    if (process.platform === "win32") {
+      return false;
+    }
+    throw err;
+  }
+}
+
 async function withStateDir<T>(stateDir: string, fn: () => Promise<T>) {
   const prev = process.env.OPENCLAW_STATE_DIR;
   const prevBundled = process.env.OPENCLAW_BUNDLED_PLUGINS_DIR;
@@ -110,6 +122,42 @@ describe("discoverOpenClawPlugins", () => {
         process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = prevBundledDir;
       }
     }
+  });
+
+  it("discovers plugin files exposed via symlink entries", async () => {
+    const stateDir = makeTempDir();
+    const globalExt = path.join(stateDir, "extensions");
+    const targetDir = makeTempDir();
+    fs.mkdirSync(globalExt, { recursive: true });
+    fs.writeFileSync(path.join(targetDir, "actual.ts"), "export default function () {}", "utf-8");
+    const created = symlinkFile(path.join(targetDir, "actual.ts"), path.join(globalExt, "gamma.ts"));
+    if (!created) {
+      return;
+    }
+
+    const { candidates } = await withStateDir(stateDir, async () => {
+      return discoverOpenClawPlugins({});
+    });
+
+    const ids = candidates.map((c) => c.idHint);
+    expect(ids).toContain("gamma");
+  });
+
+  it("ignores broken symlink entries during discovery", async () => {
+    const stateDir = makeTempDir();
+    const globalExt = path.join(stateDir, "extensions");
+    fs.mkdirSync(globalExt, { recursive: true });
+    const created = symlinkFile(path.join(globalExt, "missing.ts"), path.join(globalExt, "broken.ts"));
+    if (!created) {
+      return;
+    }
+
+    const { candidates } = await withStateDir(stateDir, async () => {
+      return discoverOpenClawPlugins({});
+    });
+
+    const ids = candidates.map((c) => c.idHint);
+    expect(ids).not.toContain("broken");
   });
 
   it("loads package extension packs", async () => {
