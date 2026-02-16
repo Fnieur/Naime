@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 
@@ -34,9 +34,20 @@ import { ensureSkillSnapshot } from "./session-updates.js";
 describe("ensureSkillSnapshot", () => {
   const cfg = {} as OpenClawConfig;
   const workspaceDir = "/workspace";
+  const origTestFast = process.env.OPENCLAW_TEST_FAST;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Disable the OPENCLAW_TEST_FAST early-return so the real skill-refresh logic runs.
+    delete process.env.OPENCLAW_TEST_FAST;
+  });
+
+  afterEach(() => {
+    if (origTestFast !== undefined) {
+      process.env.OPENCLAW_TEST_FAST = origTestFast;
+    } else {
+      delete process.env.OPENCLAW_TEST_FAST;
+    }
   });
 
   it("rebuilds snapshot when in-memory version is zero but session has a persisted snapshot from a prior process lifetime", async () => {
