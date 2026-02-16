@@ -427,6 +427,7 @@ export function attachGatewayWsMessageHandler(params: {
           close(1008, truncateCloseReason(authMessage));
         };
         if (!device) {
+          // When control-ui bypass is enabled, preserve requested scopes even without device identity.
           if (scopes.length > 0 && !allowControlUiBypass) {
             scopes = [];
             connectParams.scopes = scopes;
