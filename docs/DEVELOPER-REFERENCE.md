@@ -272,6 +272,16 @@ pnpm vitest run --coverage
 9. **Verify Node built-in imports** — `crypto`, `fs`, `path`, etc. must be imported before use. Easy to miss with `crypto.randomUUID()`.
 10. **Fallback paths must not undo the fix** — if your fix adds a safe path (e.g., temp-file + rename), the fallback/catch must NOT revert to the unsafe pattern you're fixing (e.g., direct `writeFile`).
 11. **Guard window semantics** — when adding time-based guards (e.g., spin-loop prevention), clarify whether you measure from `startedAt`, `endedAt`, or `updatedAt`. Long-running operations can exceed the guard window if anchored to start time.
+12. **`String.replace()` is not global** — `str.replace('x', 'y')` replaces only the first occurrence. Use `replaceAll()` or `/x/g`.
+13. **`new URL()` strips IPv6 brackets** — `new URL('http://[::1]').hostname` → `'::1'`. Re-add brackets when reconstructing URLs.
+14. **`split(':')` drops colons in values** — `'user:pass:word'.split(':')` → 3 parts. Use `indexOf`+`slice` to keep the value intact.
+15. **Enum vs translated string comparison** — `value === t('Active')` breaks in non-English locales. Always compare against the raw enum constant.
+16. **`if (obj)` is truthy for `{}`** — An initialized-but-empty object passes truthiness checks. Test for the specific key: `if (obj.id)`.
+17. **Glob patterns in hot loops** — `new Minimatch(pattern)` inside a loop recompiles every call. Cache the compiled matcher.
+18. **Four passes → one** — Chaining `.filter().map().reduce().forEach()` allocates intermediate arrays. Combine into a single `.reduce()`.
+19. **`@playwright/test` ≠ `playwright`** — Test runner package vs library package have different exports.
+20. **`setInterval` without `.unref()` prevents shutdown** — Background housekeeping timers keep the event loop alive.
+21. **Tests must exercise the actual code, not a copy** — Duplicating implementation in tests proves nothing. Import and call the real function.
 
 ---
 
@@ -413,6 +423,14 @@ src/<module>/
 - **Telegram media groups**: `bot-updates.ts` aggregates photos with a timeout window. Changing this can split or merge groups incorrectly.
 - **Atomic file writes need atomic fallbacks**: temp-file + rename is safe, but falling back to direct `writeFile` on rename failure reintroduces truncation races. Fallback should retry rename or fail, never bypass the atomic pattern.
 - **SQLite WAL stale readers**: cached `db` connections in WAL mode hold a snapshot. After external writes (e.g., subprocess updates), close and reopen to see new data. Set `db = null` for lazy reopen.
+- **Reconnect guard + `await`**: A boolean `isReconnecting` checked before an `await` can be disarmed by another event during the await. Use a mutex or hold the guard across the full async span. (PR #17588)
+- **Close handler nulls a replaced reference**: `onClosed` sets `socket = null`, but a new connection may have already replaced it. Compare identity before nulling. (PR #17588)
+- **Shared temp file path**: Two concurrent requests writing to `/tmp/hardcoded-name` clobber each other. Use `mktemp` or embed request IDs. (PR #17714)
+- **Duplicate timeout mechanisms**: Spawn's built-in timeout + a manual `setTimeout` race to kill the process. Pick one mechanism. (PR #17714)
+- **Cached rejected promise**: `const ready = init()` — if `init()` rejects once, `ready` is forever-rejected. Use a lazy-init pattern that retries. (PR #17428)
+- **Missing response callback in error path**: Async handler throws → response callback never called → caller hangs indefinitely. Always respond in `finally`. (PR #17343)
+- **Unguarded perpetual runner**: A single unhandled throw in an idle-trigger loop kills it permanently. Wrap loop body in try/catch. (PR #17321)
+- **FTS extension file copy race**: Multiple processes copying the same SQLite extension file simultaneously can produce a corrupted binary. Use a lock or atomic rename. (PR #17628)
 
 ### Other Landmines
 
@@ -421,3 +439,40 @@ src/<module>/
 - **Discord 2000 char limit**: `discord/chunk.ts` enforces limits with fence-aware splitting. Don't bypass the chunker.
 - **Signal styled text**: Uses byte-position ranges, not character positions. Multi-byte chars shift ranges.
 - **WhatsApp target normalization**: Converts between E.164, JID (`@s.whatsapp.net`), and display formats. Getting this wrong means messages go nowhere silently.
+- **Telegram channel posts skip the main message pipeline**: Debounce, dedup (`shouldSkipUpdate`), media resolution, and access control need separate handling for `channel_post`. (PR #17857)
+- **ZWNJ (U+200C) in terminal output corrupts URLs**: Invisible but breaks copy-paste. Strip ZWNJ from any string rendered as a link. (PR #17777)
+- **SwiftPM resolves the max deployment target across all deps**: One dependency requiring macOS 15 pulls the entire graph to macOS 15. (PR #17720)
+- **Legacy config migration runs unconditionally**: Re-applies defaults on every startup, overwriting user removals. Gate behind schema-version. (PR #17637)
+- **Comments that contradict code are worse than no comments**: "PUT /api/x" above a POST call actively misleads. Delete stale comments during review. (PR #17558)
+- **Duplicate type definitions drift**: Two `interface Foo` in different files diverge silently. Single source of truth, re-export everywhere. (PR #17690)
+- **Telegram @-username is ambiguous**: `@foo` can be a user, bot, or public supergroup. Always check resolved entity type. (PR #17433)
+
+---
+
+## 10. Security Checklist
+
+> Apply to every PR that touches networking, user input, shell execution, or secrets.
+
+| Check | Description |
+|-------|-------------|
+| **SSRF** | Validate the **resolved IP**, not just hostname. Use `fetchWithSsrFGuard()`. (PR #17762) |
+| **Error exposure** | Never send stack traces or internal paths to user-supplied callback URLs. (PR #17762) |
+| **External content** | All untrusted content must be wrapped with `externalContent` metadata. (PR #17703) |
+| **Path traversal** | `path.basename()` user-supplied names; reject path separators. A skill name like `../../etc` = arbitrary deletion. (PR #17503) |
+| **Shell injection** | Never interpolate user strings into shell commands. Use `execFile` with arg arrays. (PR #17667) |
+| **Prompt injection** | PR titles, file paths, user text in LLM prompts can hijack the model. Escape or sandbox. (PR #17349) |
+| **curl \| sh** | Don't. Use checksummed package downloads. (PR #17661) |
+| **Honest UA** | Automated HTTP requests must not impersonate real browsers. (PR #17768) |
+| **Key cleanup** | Zero secret buffers in `finally` blocks, not just success paths. (PR #17454) |
+| **Exec approvals** | Any new shell/exec code path must go through the exec-approval system. (PR #17667) |
+
+---
+
+## 11. Packaging & Dependencies
+
+- **`openclaw` in `devDependencies`, never `dependencies`** — shipping the CLI to end users bloats installs. (PR #17714)
+- **Declare every `import` in `package.json`** — don't rely on workspace hoisting. `zod`, `playwright`, etc. must appear in your package's own `dependencies`. (PR #17714)
+- **Run `depcheck` periodically** — unused deps slow installs and widen attack surface. (PR #17566)
+- **Align sub-package versions with root `package.json`** — mismatches cause resolution surprises. (PR #17551)
+- **Use the correct package variant** — `@playwright/test` (test framework) ≠ `playwright` (automation library). (PR #17392)
+- **Check for merge-conflict backup files** — `*.orig`, `*.bak` should never be committed. Add to `.gitignore`. (PR #17387)
