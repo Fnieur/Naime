@@ -3,6 +3,7 @@ import type { ReplyPayload } from "../types.js";
 import type { HandleCommandsParams } from "./commands-types.js";
 import { resolveSessionAgentIds } from "../../agents/agent-scope.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
+import { resolveAgentIdentityPrompt } from "../../agents/identity-prompt.js";
 import { resolveDefaultModelForAgent } from "../../agents/model-selection.js";
 import {
   resolveBootstrapMaxChars,
@@ -110,6 +111,11 @@ async function resolveContextReport(
     sessionKey: params.sessionKey,
     config: params.cfg,
   });
+  const identity = resolveAgentIdentityPrompt({
+    config: params.cfg,
+    agentId: sessionAgentId,
+    workspaceDir,
+  });
   const defaultModelRef = resolveDefaultModelForAgent({
     cfg: params.cfg,
     agentId: sessionAgentId,
@@ -147,6 +153,7 @@ async function resolveContextReport(
     defaultThinkLevel: params.resolvedThinkLevel,
     reasoningLevel: params.resolvedReasoningLevel,
     extraSystemPrompt: undefined,
+    identity,
     ownerNumbers: undefined,
     reasoningTagHint: false,
     toolNames,

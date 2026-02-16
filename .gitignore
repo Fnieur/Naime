@@ -72,10 +72,15 @@ apps/ios/*.mobileprovision
 # Local untracked files
 .local/
 docs/.local/
+.ai/
+_tmp_*
+ARCHITECTURE.md
+STATE.md
 IDENTITY.md
 USER.md
 .tgz
 .idea
+.tagers/backups/
 
 # local tooling
 .serena/

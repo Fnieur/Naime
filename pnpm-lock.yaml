@@ -249,6 +249,8 @@ importers:
         specifier: workspace:*
         version: link:../..
 
+  extensions/clickup: {}
+
   extensions/copilot-proxy:
     devDependencies:
       openclaw:

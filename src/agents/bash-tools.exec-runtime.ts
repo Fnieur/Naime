@@ -300,6 +300,7 @@ export async function runExecProcess(opts: {
   const sessionId = createSessionSlug();
   const execCommand = opts.execCommand ?? opts.command;
   const supervisor = getProcessSupervisor();
+  const onUpdate = opts.onUpdate;
 
   const session: ProcessSession = {
     id: sessionId,
@@ -332,12 +333,12 @@ export async function runExecProcess(opts: {
   addSession(session);
 
   const emitUpdate = () => {
-    if (!opts.onUpdate) {
+    if (!onUpdate) {
       return;
     }
     const tailText = session.tail || session.aggregated;
     const warningText = opts.warnings.length ? `${opts.warnings.join("\n")}\n\n` : "";
-    opts.onUpdate({
+    onUpdate({
       content: [{ type: "text", text: warningText + (tailText || "") }],
       details: {
         status: "running",

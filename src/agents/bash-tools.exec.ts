@@ -1,6 +1,7 @@
 import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
 import crypto from "node:crypto";
 import type { BashSandboxConfig } from "./bash-tools.shared.js";
+import type { WorkspaceGuardSnapshot } from "./workspace-guard.js";
 import {
   type ExecAsk,
   type ExecHost,
@@ -60,6 +61,7 @@ import {
 } from "./bash-tools.shared.js";
 import { callGatewayTool } from "./tools/gateway.js";
 import { listNodes, resolveNodeIdFromList } from "./tools/nodes-utils.js";
+import { restoreWorkspaceGuardIfMissing, snapshotWorkspaceGuard } from "./workspace-guard.js";
 
 export type ExecToolDefaults = {
   host?: ExecHost;
@@ -170,6 +172,40 @@ export function createExecTool(
       if (!params.command) {
         throw new Error("Provide a command to start.");
       }
+
+      // Workspace guard: if the agent deletes key identity/memory files via exec, restore them.
+      // This is best-effort and only restores files that went missing (no content rollback).
+      const guardWorkspaceDir = defaults?.cwd?.trim() || "";
+      const snapshotGuard = async (): Promise<WorkspaceGuardSnapshot | null> => {
+        if (!guardWorkspaceDir) {
+          return null;
+        }
+        try {
+          return await snapshotWorkspaceGuard({ workspaceDir: guardWorkspaceDir, agentId });
+        } catch {
+          return null;
+        }
+      };
+      const createRestoreOnce = (snapshot: WorkspaceGuardSnapshot | null) => {
+        let promise: Promise<string[]> | null = null;
+        return () => {
+          if (!snapshot || !guardWorkspaceDir) {
+            return Promise.resolve<string[]>([]);
+          }
+          promise ??= (async () => {
+            try {
+              const result = await restoreWorkspaceGuardIfMissing({
+                workspaceDir: guardWorkspaceDir,
+                backupDir: snapshot.backupDir,
+              });
+              return result.restored;
+            } catch {
+              return [];
+            }
+          })();
+          return promise;
+        };
+      };
 
       const maxOutput = DEFAULT_MAX_OUTPUT;
       const pendingMaxOutput = DEFAULT_PENDING_MAX_OUTPUT;
@@ -739,6 +775,8 @@ export function createExecTool(
             }
 
             let run: ExecProcessHandle | null = null;
+            const guardSnapshot = await snapshotGuard();
+            const restoreOnce = createRestoreOnce(guardSnapshot);
             try {
               run = await runExecProcess({
                 command: commandText,
@@ -777,16 +815,21 @@ export function createExecTool(
             }
 
             const outcome = await run.promise;
+            const restoredFiles = await restoreOnce();
             if (runningTimer) {
               clearTimeout(runningTimer);
             }
             const output = normalizeNotifyOutput(
               tail(outcome.aggregated || "", DEFAULT_NOTIFY_TAIL_CHARS),
             );
+            const restoredNote =
+              restoredFiles.length > 0
+                ? `\n\nWorkspace guard restored missing files: ${restoredFiles.join(", ")}`
+                : "";
             const exitLabel = outcome.timedOut ? "timeout" : `code ${outcome.exitCode ?? "?"}`;
             const summary = output
-              ? `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})\n${output}`
-              : `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})`;
+              ? `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})\n${output}${restoredNote}`
+              : `Exec finished (gateway id=${approvalId}, session=${run.session.id}, ${exitLabel})${restoredNote}`;
             emitExecSystemEvent(summary, { sessionKey: notifySessionKey, contextKey });
           })();
 
@@ -874,6 +917,8 @@ export function createExecTool(
         typeof params.timeout === "number" ? params.timeout : defaultTimeoutSec;
       const getWarningText = () => (warnings.length ? `${warnings.join("\n")}\n\n` : "");
       const usePty = params.pty === true && !sandbox;
+      const guardSnapshot = await snapshotGuard();
+      const restoreOnce = createRestoreOnce(guardSnapshot);
       const run = await runExecProcess({
         command: params.command,
         execCommand: execCommandOverride,
@@ -891,6 +936,14 @@ export function createExecTool(
         sessionKey: notifySessionKey,
         timeoutSec: effectiveTimeout,
         onUpdate,
+      });
+      void run.promise.finally(async () => {
+        const restored = await restoreOnce();
+        if (restored.length) {
+          emitExecSystemEvent(`Workspace guard restored missing files: ${restored.join(", ")}`, {
+            sessionKey: notifySessionKey,
+          });
+        }
       });
 
       let yielded = false;
@@ -959,7 +1012,7 @@ export function createExecTool(
         }
 
         run.promise
-          .then((outcome) => {
+          .then(async (outcome) => {
             if (yieldTimer) {
               clearTimeout(yieldTimer);
             }
@@ -969,6 +1022,10 @@ export function createExecTool(
             if (outcome.status === "failed") {
               reject(new Error(outcome.reason ?? "Command failed."));
               return;
+            }
+            const restored = await restoreOnce();
+            if (restored.length) {
+              warnings.push(`Workspace guard restored missing files: ${restored.join(", ")}`);
             }
             resolve({
               content: [

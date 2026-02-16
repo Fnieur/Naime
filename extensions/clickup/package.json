@@ -1,0 +1,12 @@
+{
+  "name": "@openclaw/clickup",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenClaw ClickUp integration plugin",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

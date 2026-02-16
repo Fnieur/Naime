@@ -12,8 +12,13 @@ function throwAbortError(): never {
  * This is more reliable than `instanceof` across different realms (VM, iframe, etc.)
  * where the AbortSignal constructor may differ.
  */
-function isAbortSignal(obj: unknown): obj is AbortSignal {
-  return obj instanceof AbortSignal;
+function isAbortSignal(value: unknown): value is AbortSignal {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as AbortSignal).aborted === "boolean" &&
+    typeof (value as AbortSignal).addEventListener === "function"
+  );
 }
 
 function combineAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
@@ -57,11 +62,18 @@ export function wrapToolWithAbortSignal(
   return {
     ...tool,
     execute: async (toolCallId, params, signal, onUpdate) => {
-      const combined = combineAbortSignals(signal, abortSignal);
+      let resolvedSignal: AbortSignal | undefined;
+      let resolvedOnUpdate = typeof onUpdate === "function" ? onUpdate : undefined;
+      if (isAbortSignal(signal)) {
+        resolvedSignal = signal;
+      } else if (typeof signal === "function" && !resolvedOnUpdate) {
+        resolvedOnUpdate = signal;
+      }
+      const combined = combineAbortSignals(resolvedSignal, abortSignal);
       if (combined?.aborted) {
         throwAbortError();
       }
-      return await execute(toolCallId, params, combined, onUpdate);
+      return await execute(toolCallId, params, combined, resolvedOnUpdate);
     },
   };
 }

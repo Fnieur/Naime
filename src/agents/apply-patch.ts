@@ -6,6 +6,17 @@ import path from "node:path";
 import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import { applyUpdateHunk } from "./apply-patch-update.js";
 import { assertSandboxPath } from "./sandbox-paths.js";
+import {
+  DEFAULT_AGENTS_FILENAME,
+  DEFAULT_BOOTSTRAP_FILENAME,
+  DEFAULT_HEARTBEAT_FILENAME,
+  DEFAULT_IDENTITY_FILENAME,
+  DEFAULT_MEMORY_ALT_FILENAME,
+  DEFAULT_MEMORY_FILENAME,
+  DEFAULT_SOUL_FILENAME,
+  DEFAULT_TOOLS_FILENAME,
+  DEFAULT_USER_FILENAME,
+} from "./workspace.js";
 
 const BEGIN_PATCH_MARKER = "*** Begin Patch";
 const END_PATCH_MARKER = "*** End Patch";
@@ -71,6 +82,41 @@ type ApplyPatchOptions = {
   workspaceOnly?: boolean;
   signal?: AbortSignal;
 };
+
+const PROTECTED_WORKSPACE_RELATIVE_PATHS = new Set<string>(
+  [
+    DEFAULT_AGENTS_FILENAME,
+    DEFAULT_SOUL_FILENAME,
+    DEFAULT_TOOLS_FILENAME,
+    DEFAULT_IDENTITY_FILENAME,
+    DEFAULT_USER_FILENAME,
+    DEFAULT_HEARTBEAT_FILENAME,
+    DEFAULT_BOOTSTRAP_FILENAME,
+    DEFAULT_MEMORY_FILENAME,
+    DEFAULT_MEMORY_ALT_FILENAME,
+  ].map((p) => p.toLowerCase()),
+);
+
+function normalizeRelativePathForGuard(rel: string): string {
+  return rel.split(path.sep).filter(Boolean).join(path.posix.sep);
+}
+
+function isProtectedWorkspacePath(resolvedPath: string, cwd: string): boolean {
+  const rel = path.relative(cwd, resolvedPath);
+  if (!rel || rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return false;
+  }
+  const normalized = normalizeRelativePathForGuard(rel);
+  const normalizedLower = normalized.toLowerCase();
+  if (PROTECTED_WORKSPACE_RELATIVE_PATHS.has(normalizedLower)) {
+    return true;
+  }
+  // Daily memory logs: memory/YYYY-MM-DD.md (treat as protected from deletion/move).
+  if (normalizedLower.startsWith(`memory${path.posix.sep}`)) {
+    return true;
+  }
+  return false;
+}
 
 const applyPatchSchema = Type.Object({
   input: Type.String({
@@ -156,6 +202,11 @@ export async function applyPatch(
 
     if (hunk.kind === "delete") {
       const target = await resolvePatchPath(hunk.path, options, "unlink");
+      if (isProtectedWorkspacePath(target.resolved, options.cwd)) {
+        throw new Error(
+          `Refusing to delete protected workspace file: ${path.basename(target.resolved)}`,
+        );
+      }
       await fileOps.remove(target.resolved);
       recordSummary(summary, seen, "deleted", target.display);
       continue;
@@ -168,6 +219,14 @@ export async function applyPatch(
 
     if (hunk.movePath) {
       const moveTarget = await resolvePatchPath(hunk.movePath, options);
+      if (
+        isProtectedWorkspacePath(target.resolved, options.cwd) ||
+        isProtectedWorkspacePath(moveTarget.resolved, options.cwd)
+      ) {
+        throw new Error(
+          `Refusing to move protected workspace file: ${path.basename(target.resolved)}`,
+        );
+      }
       await ensureDir(moveTarget.resolved, fileOps);
       await fileOps.writeFile(moveTarget.resolved, applied);
       await fileOps.remove(target.resolved);
