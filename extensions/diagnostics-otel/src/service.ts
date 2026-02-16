@@ -508,7 +508,7 @@ export function createDiagnosticsOtelService(): OpenClawPluginService {
           spanAttrs["openclaw.reason"] = redactSensitiveText(evt.reason);
         }
         const span = spanWithDuration("openclaw.message.processed", spanAttrs, evt.durationMs);
-        if (evt.outcome === "error") {
+        if (evt.outcome === "error" && evt.error) {
           span.setStatus({ code: SpanStatusCode.ERROR, message: redactSensitiveText(evt.error) });
         }
         span.end();
