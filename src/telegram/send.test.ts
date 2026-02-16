@@ -1448,7 +1448,7 @@ describe("createForumTopicTelegram", () => {
 
     const result = await createForumTopicTelegram("telegram:group:-1001234567890:topic:271", "x", {
       token: "tok",
-      api,
+      api: api as unknown as Bot["api"],
     });
 
     expect(createForumTopic).toHaveBeenCalledWith("-1001234567890", "x", undefined);
@@ -1470,7 +1470,7 @@ describe("createForumTopicTelegram", () => {
 
     await createForumTopicTelegram("-1001234567890", "Roadmap", {
       token: "tok",
-      api,
+      api: api as unknown as Bot["api"],
       iconColor: 0x6fb9f0,
       iconCustomEmojiId: "  1234567890  ",
     });

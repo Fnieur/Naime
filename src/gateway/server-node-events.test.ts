@@ -18,9 +18,12 @@ vi.mock("../config/sessions.js", () => ({
 }));
 vi.mock("./session-utils.js", () => ({
   loadSessionEntry: vi.fn((sessionKey: string) => ({
+    cfg: {},
     storePath: "/tmp/sessions.json",
-    entry: { sessionId: `sid-${sessionKey}` },
+    store: {},
+    entry: { sessionId: `sid-${sessionKey}`, updatedAt: Date.now() },
     canonicalKey: sessionKey,
+    legacyKey: undefined,
   })),
   pruneLegacyStoreKeys: vi.fn(),
   resolveGatewaySessionStoreTarget: vi.fn(({ key }: { key: string }) => ({
@@ -30,12 +33,12 @@ vi.mock("./session-utils.js", () => ({
 }));
 
 import type { CliDeps } from "../cli/deps.js";
-import type { HealthSummary } from "../commands/health.js";
-import type { NodeEventContext } from "./server-node-events-types.js";
 import { agentCommand } from "../commands/agent.js";
+import type { HealthSummary } from "../commands/health.js";
 import { updateSessionStore } from "../config/sessions.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
+import type { NodeEventContext } from "./server-node-events-types.js";
 import { handleNodeEvent } from "./server-node-events.js";
 import { loadSessionEntry } from "./session-utils.js";
 
@@ -280,9 +283,12 @@ describe("agent request events", () => {
       update({});
     });
     loadSessionEntryMock.mockImplementation((sessionKey: string) => ({
+      cfg: {},
       storePath: "/tmp/sessions.json",
-      entry: { sessionId: `sid-${sessionKey}` },
+      store: {},
+      entry: { sessionId: `sid-${sessionKey}`, updatedAt: Date.now() },
       canonicalKey: sessionKey,
+      legacyKey: undefined,
     }));
   });
 
@@ -317,13 +323,17 @@ describe("agent request events", () => {
   it("reuses the current session route when delivery target is omitted", async () => {
     const ctx = buildCtx();
     loadSessionEntryMock.mockReturnValueOnce({
+      cfg: {},
       storePath: "/tmp/sessions.json",
+      store: {},
       entry: {
         sessionId: "sid-current",
+        updatedAt: Date.now(),
         lastChannel: "telegram",
         lastTo: "123",
       },
       canonicalKey: "agent:main:main",
+      legacyKey: undefined,
     });
 
     await handleNodeEvent(ctx, "node-route-hit", {
