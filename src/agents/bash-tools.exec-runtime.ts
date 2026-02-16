@@ -300,6 +300,7 @@ export async function runExecProcess(opts: {
   const sessionId = createSessionSlug();
   const execCommand = opts.execCommand ?? opts.command;
   const supervisor = getProcessSupervisor();
+  const onUpdate = opts.onUpdate;
 
   const session: ProcessSession = {
     id: sessionId,
