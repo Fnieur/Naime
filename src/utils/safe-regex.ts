@@ -18,8 +18,7 @@ export function isSafeRegexPattern(pattern: string): boolean {
   // Detect nested quantifiers: groups with quantifiers containing quantified content
   // Patterns like (a+)+, (a*)+, (a+)*, (a|b+)+, (a{2,10})+, etc.
   // Include curly-brace quantifiers {n}, {n,}, {n,m} alongside +*?
-  const nestedQuantifierRe =
-    /\([^)]*[+*{][^)]*\)[+*?{]|\([^)]*[+*?{]\)[+*{]/;
+  const nestedQuantifierRe = /\([^)]*[+*{][^)]*\)[+*?{]|\([^)]*[+*?{]\)[+*{]/;
   // Also detect nested groups with quantifiers: ((a+))+
   const nestedGroupsRe = /\([^()]*\([^)]*[+*?{][^)]*\)[^()]*\)[+*?{]/;
   if (nestedQuantifierRe.test(pattern) || nestedGroupsRe.test(pattern)) {
