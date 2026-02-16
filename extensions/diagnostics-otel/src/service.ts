@@ -452,7 +452,7 @@ export function createDiagnosticsOtelService(): OpenClawPluginService {
         }
         const spanAttrs: Record<string, string | number> = {
           ...attrs,
-          "openclaw.error": evt.error,
+          "openclaw.error": redactSensitiveText(evt.error),
         };
         if (evt.chatId !== undefined) {
           spanAttrs["openclaw.chatId"] = String(evt.chatId);
@@ -460,7 +460,7 @@ export function createDiagnosticsOtelService(): OpenClawPluginService {
         const span = tracer.startSpan("openclaw.webhook.error", {
           attributes: spanAttrs,
         });
-        span.setStatus({ code: SpanStatusCode.ERROR, message: evt.error });
+        span.setStatus({ code: SpanStatusCode.ERROR, message: redactSensitiveText(evt.error) });
         span.end();
       };
 
@@ -505,11 +505,11 @@ export function createDiagnosticsOtelService(): OpenClawPluginService {
           spanAttrs["openclaw.messageId"] = String(evt.messageId);
         }
         if (evt.reason) {
-          spanAttrs["openclaw.reason"] = evt.reason;
+          spanAttrs["openclaw.reason"] = redactSensitiveText(evt.reason);
         }
         const span = spanWithDuration("openclaw.message.processed", spanAttrs, evt.durationMs);
         if (evt.outcome === "error") {
-          span.setStatus({ code: SpanStatusCode.ERROR, message: evt.error });
+          span.setStatus({ code: SpanStatusCode.ERROR, message: redactSensitiveText(evt.error) });
         }
         span.end();
       };
