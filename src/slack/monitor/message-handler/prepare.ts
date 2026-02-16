@@ -618,6 +618,7 @@ export async function prepareSlackMessage(params: {
     ThreadStarterBody: threadStarterBody,
     ThreadHistoryBody: threadHistoryBody,
     ThreadTs: isThreadReply ? threadTs : undefined,
+    ProviderChannelId: message.channel,
     IsFirstThreadTurn:
       isThreadReply && threadTs && !threadSessionPreviousTimestamp ? true : undefined,
     ThreadLabel: threadLabel,
