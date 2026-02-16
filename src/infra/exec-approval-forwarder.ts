@@ -13,6 +13,7 @@ import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
 import { isDeliverableMessageChannel, normalizeMessageChannel } from "../utils/message-channel.js";
+import { safePatternMatch } from "../utils/safe-regex.js";
 import { deliverOutboundPayloads } from "./outbound/deliver.js";
 import { resolveSessionDeliveryTarget } from "./outbound/targets.js";
 
@@ -51,13 +52,7 @@ function normalizeMode(mode?: ExecApprovalForwardingConfig["mode"]) {
 }
 
 function matchSessionFilter(sessionKey: string, patterns: string[]): boolean {
-  return patterns.some((pattern) => {
-    try {
-      return sessionKey.includes(pattern) || new RegExp(pattern).test(sessionKey);
-    } catch {
-      return sessionKey.includes(pattern);
-    }
-  });
+  return patterns.some((pattern) => safePatternMatch(sessionKey, pattern, log));
 }
 
 function shouldForward(params: {
