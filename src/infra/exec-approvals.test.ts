@@ -11,6 +11,7 @@ import {
   isSafeBinUsage,
   matchAllowlist,
   maxAsk,
+  mergeExecApprovalsSocketDefaults,
   minSecurity,
   normalizeExecApprovals,
   normalizeSafeBins,
@@ -76,6 +77,36 @@ describe("exec approvals allowlist matching", () => {
     const entries: ExecAllowlistEntry[] = [{ pattern: "bin/rg" }];
     const match = matchAllowlist(entries, resolution);
     expect(match).toBeNull();
+  });
+});
+
+describe("mergeExecApprovalsSocketDefaults", () => {
+  it("prefers normalized socket, then current, then default path", () => {
+    const normalized = normalizeExecApprovals({
+      version: 1,
+      agents: {},
+      socket: { path: "/tmp/a.sock", token: "a" },
+    });
+    const current = normalizeExecApprovals({
+      version: 1,
+      agents: {},
+      socket: { path: "/tmp/b.sock", token: "b" },
+    });
+    const merged = mergeExecApprovalsSocketDefaults({ normalized, current });
+    expect(merged.socket?.path).toBe("/tmp/a.sock");
+    expect(merged.socket?.token).toBe("a");
+  });
+
+  it("falls back to current token when missing in normalized", () => {
+    const normalized = normalizeExecApprovals({ version: 1, agents: {} });
+    const current = normalizeExecApprovals({
+      version: 1,
+      agents: {},
+      socket: { path: "/tmp/b.sock", token: "b" },
+    });
+    const merged = mergeExecApprovalsSocketDefaults({ normalized, current });
+    expect(merged.socket?.path).toBeTruthy();
+    expect(merged.socket?.token).toBe("b");
   });
 });
 
@@ -459,6 +490,11 @@ describe("exec approvals allowlist evaluation", () => {
       safeBins: normalizeSafeBins(["jq"]),
       cwd: "/tmp",
     });
+    // Safe bins are disabled on Windows (PowerShell parsing/expansion differences).
+    if (process.platform === "win32") {
+      expect(result.allowlistSatisfied).toBe(false);
+      return;
+    }
     expect(result.allowlistSatisfied).toBe(true);
     expect(result.allowlistMatches).toEqual([]);
   });
@@ -651,6 +687,11 @@ describe("exec approvals node host allowlist check", () => {
       safeBins: normalizeSafeBins(["jq"]),
       cwd: "/tmp",
     });
+    // Safe bins are disabled on Windows (PowerShell parsing/expansion differences).
+    if (process.platform === "win32") {
+      expect(safe).toBe(false);
+      return;
+    }
     expect(safe).toBe(true);
   });
 });

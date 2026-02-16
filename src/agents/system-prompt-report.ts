@@ -1,5 +1,6 @@
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { estimateTokens } from "@mariozechner/pi-coding-agent";
+import path from "node:path";
 import type { SessionSystemPromptReport } from "../config/sessions/types.js";
 import type { EmbeddedContextFile } from "./pi-embedded-helpers.js";
 import type { WorkspaceBootstrapFile } from "./workspace.js";
@@ -41,10 +42,21 @@ function buildInjectedWorkspaceFiles(params: {
   injectedFiles: EmbeddedContextFile[];
   bootstrapMaxChars: number;
 }): SessionSystemPromptReport["injectedWorkspaceFiles"] {
-  const injectedByName = new Map(params.injectedFiles.map((f) => [f.path, f.content]));
+  const injectedByPath = new Map(params.injectedFiles.map((f) => [f.path, f.content]));
+  const injectedByBaseName = new Map<string, string>();
+  for (const file of params.injectedFiles) {
+    const normalizedPath = file.path.replace(/\\/g, "/");
+    const baseName = path.posix.basename(normalizedPath);
+    if (!injectedByBaseName.has(baseName)) {
+      injectedByBaseName.set(baseName, file.content);
+    }
+  }
   return params.bootstrapFiles.map((file) => {
     const rawChars = file.missing ? 0 : (file.content ?? "").trimEnd().length;
-    const injected = injectedByName.get(file.name);
+    const injected =
+      injectedByPath.get(file.path) ??
+      injectedByPath.get(file.name) ??
+      injectedByBaseName.get(file.name);
     const injectedChars = injected ? injected.length : 0;
     const truncated = !file.missing && rawChars > params.bootstrapMaxChars;
     return {

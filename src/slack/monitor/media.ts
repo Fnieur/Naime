@@ -1,16 +1,9 @@
 import type { WebClient as SlackWebClient } from "@slack/web-api";
 import type { FetchLike } from "../../media/fetch.js";
 import type { SlackFile } from "../types.js";
+import { normalizeHostname } from "../../infra/net/hostname.js";
 import { fetchRemoteMedia } from "../../media/fetch.js";
 import { saveMediaBuffer } from "../../media/store.js";
-
-function normalizeHostname(hostname: string): string {
-  const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
-  if (normalized.startsWith("[") && normalized.endsWith("]")) {
-    return normalized.slice(1, -1);
-  }
-  return normalized;
-}
 
 function isSlackHostname(hostname: string): boolean {
   const normalized = normalizeHostname(hostname);
@@ -233,17 +226,49 @@ export type SlackThreadStarter = {
   files?: SlackFile[];
 };
 
-const THREAD_STARTER_CACHE = new Map<string, SlackThreadStarter>();
+type SlackThreadStarterCacheEntry = {
+  value: SlackThreadStarter;
+  cachedAt: number;
+};
+
+const THREAD_STARTER_CACHE = new Map<string, SlackThreadStarterCacheEntry>();
+const THREAD_STARTER_CACHE_TTL_MS = 6 * 60 * 60_000;
+const THREAD_STARTER_CACHE_MAX = 2000;
+
+function evictThreadStarterCache(): void {
+  const now = Date.now();
+  for (const [cacheKey, entry] of THREAD_STARTER_CACHE.entries()) {
+    if (now - entry.cachedAt > THREAD_STARTER_CACHE_TTL_MS) {
+      THREAD_STARTER_CACHE.delete(cacheKey);
+    }
+  }
+  if (THREAD_STARTER_CACHE.size <= THREAD_STARTER_CACHE_MAX) {
+    return;
+  }
+  const excess = THREAD_STARTER_CACHE.size - THREAD_STARTER_CACHE_MAX;
+  let removed = 0;
+  for (const cacheKey of THREAD_STARTER_CACHE.keys()) {
+    THREAD_STARTER_CACHE.delete(cacheKey);
+    removed += 1;
+    if (removed >= excess) {
+      break;
+    }
+  }
+}
 
 export async function resolveSlackThreadStarter(params: {
   channelId: string;
   threadTs: string;
   client: SlackWebClient;
 }): Promise<SlackThreadStarter | null> {
+  evictThreadStarterCache();
   const cacheKey = `${params.channelId}:${params.threadTs}`;
   const cached = THREAD_STARTER_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt <= THREAD_STARTER_CACHE_TTL_MS) {
+    return cached.value;
+  }
   if (cached) {
-    return cached;
+    THREAD_STARTER_CACHE.delete(cacheKey);
   }
   try {
     const response = (await params.client.conversations.replies({
@@ -263,11 +288,22 @@ export async function resolveSlackThreadStarter(params: {
       ts: message.ts,
       files: message.files,
     };
-    THREAD_STARTER_CACHE.set(cacheKey, starter);
+    if (THREAD_STARTER_CACHE.has(cacheKey)) {
+      THREAD_STARTER_CACHE.delete(cacheKey);
+    }
+    THREAD_STARTER_CACHE.set(cacheKey, {
+      value: starter,
+      cachedAt: Date.now(),
+    });
+    evictThreadStarterCache();
     return starter;
   } catch {
     return null;
   }
+}
+
+export function resetSlackThreadStarterCacheForTest(): void {
+  THREAD_STARTER_CACHE.clear();
 }
 
 export type SlackThreadMessage = {

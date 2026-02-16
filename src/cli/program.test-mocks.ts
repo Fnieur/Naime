@@ -1,21 +1,25 @@
-import { vi } from "vitest";
+import { Mock, vi } from "vitest";
 
-export const messageCommand = vi.fn();
-export const statusCommand = vi.fn();
-export const configureCommand = vi.fn();
-export const configureCommandWithSections = vi.fn();
-export const setupCommand = vi.fn();
-export const onboardCommand = vi.fn();
-export const callGateway = vi.fn();
-export const runChannelLogin = vi.fn();
-export const runChannelLogout = vi.fn();
-export const runTui = vi.fn();
+export const messageCommand: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const statusCommand: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const configureCommand: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const configureCommandWithSections: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const setupCommand: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const onboardCommand: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const callGateway: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const runChannelLogin: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const runChannelLogout: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const runTui: Mock<(...args: unknown[]) => unknown> = vi.fn();
 
-export const loadAndMaybeMigrateDoctorConfig = vi.fn();
-export const ensureConfigReady = vi.fn();
-export const ensurePluginRegistryLoaded = vi.fn();
+export const loadAndMaybeMigrateDoctorConfig: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const ensureConfigReady: Mock<(...args: unknown[]) => unknown> = vi.fn();
+export const ensurePluginRegistryLoaded: Mock<(...args: unknown[]) => unknown> = vi.fn();
 
-export const runtime = {
+export const runtime: {
+  log: Mock<(...args: unknown[]) => void>;
+  error: Mock<(...args: unknown[]) => void>;
+  exit: Mock<(...args: unknown[]) => never>;
+} = {
   log: vi.fn(),
   error: vi.fn(),
   exit: vi.fn(() => {
@@ -39,6 +43,13 @@ export function installBaseProgramMocks() {
     ],
     configureCommand,
     configureCommandWithSections,
+    configureCommandFromSectionsArg: (sections: unknown, runtime: unknown) => {
+      const resolved = Array.isArray(sections) ? sections : [];
+      if (resolved.length > 0) {
+        return configureCommandWithSections(resolved, runtime);
+      }
+      return configureCommand({}, runtime);
+    },
   }));
   vi.mock("../commands/setup.js", () => ({ setupCommand }));
   vi.mock("../commands/onboard.js", () => ({ onboardCommand }));
