@@ -1,3 +1,11 @@
+import type {
+  HeartbeatStatus,
+  SessionGroup,
+  SessionGroups,
+  SessionStatus,
+  SessionType,
+  StatusSummary,
+} from "./status.types.js";
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { resolveConfiguredModelRef } from "../agents/model-selection.js";
@@ -14,8 +22,64 @@ import { buildChannelSummary } from "../infra/channel-summary.js";
 import { resolveHeartbeatSummaryForAgent } from "../infra/heartbeat-runner.js";
 import { peekSystemEvents } from "../infra/system-events.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
+import { isCronJobSessionKey, isCronRunSessionKey } from "../sessions/session-key-utils.js";
 import { resolveLinkChannelContext } from "./status.link-channel.js";
-import type { HeartbeatStatus, SessionStatus, StatusSummary } from "./status.types.js";
+
+/**
+ * Classify session type for grouping in status output.
+ * Uses canonical session-key utilities (`isCronJobSessionKey` / `isCronRunSessionKey`) for cron detection.
+ * - main: Primary interactive session (agent:xxx:main, direct sessions, per-peer sessions)
+ * - cronJob: Cron job definition (agent:xxx:cron:uuid)
+ * - cronRun: Individual cron execution (agent:xxx:cron:uuid:run:uuid)
+ * - other: Everything else (group sessions, channels, subagents, acp, etc.)
+ *
+ * @internal Exported for testing purposes only
+ */
+export function classifySessionType(key: string, kind?: SessionStatus["kind"]): SessionType {
+  const parsed = parseAgentSessionKey(key);
+
+  // Non-agent keys (global/unknown/legacy aliases) are not interactive sessions.
+  if (!parsed) {
+    return "other";
+  }
+
+  // Cron split (primary goal of this refactor)
+  if (isCronRunSessionKey(key)) {
+    return "cronRun";
+  }
+  if (isCronJobSessionKey(key)) {
+    return "cronJob";
+  }
+
+  // Non-interactive agent sessions
+  const restParts = parsed.rest
+    .split(":")
+    .filter(Boolean)
+    .map((p) => p.toLowerCase());
+  const head = restParts[0] ?? "";
+  const second = restParts[1] ?? "";
+  if (head === "subagent" || head === "acp") {
+    return "other";
+  }
+  if (head === "group" || head === "channel" || second === "group" || second === "channel") {
+    return "other";
+  }
+
+  // Main vs other: prefer existing kind when provided (direct => main, group/global/unknown => other)
+  if (kind) {
+    return kind === "direct" ? "main" : "other";
+  }
+
+  // Fallback: token-based heuristics (no regex)
+  if (head === "main") {
+    return "main";
+  }
+  if (restParts.includes("direct")) {
+    return "main";
+  }
+
+  return "main";
+}
 
 const buildFlags = (entry?: SessionEntry): string[] => {
   if (!entry) {
@@ -51,6 +115,36 @@ const buildFlags = (entry?: SessionEntry): string[] => {
   return flags;
 };
 
+/**
+ * Group sessions by type for improved status display.
+ * Collapses cron run history when there are many entries.
+ *
+ * @internal Exported for testing purposes only
+ */
+export function groupSessions(sessions: SessionStatus[]): SessionGroups {
+  const main = sessions.filter((s) => s.sessionType === "main");
+  const cronJobs = sessions.filter((s) => s.sessionType === "cronJob");
+  const cronRuns = sessions.filter((s) => s.sessionType === "cronRun");
+  const other = sessions.filter((s) => s.sessionType === "other");
+
+  // Collapse cron runs if there are many (show only count, not all sessions)
+  const shouldCollapseRuns = cronRuns.length > 20;
+
+  const createGroup = (label: string, items: SessionStatus[], collapsed: boolean): SessionGroup => ({
+    label,
+    count: items.length,
+    sessions: collapsed ? items.slice(0, 5) : items,
+    collapsed,
+  });
+
+  return {
+    active: createGroup("Active", main, false),
+    cronJobs: createGroup("Cron Jobs", cronJobs, false),
+    cronRuns: createGroup("Recent Runs", cronRuns, shouldCollapseRuns),
+    other: createGroup("Other", other, false),
+  };
+}
+
 export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSummary {
   return {
     ...summary,
@@ -67,6 +161,7 @@ export function redactSensitiveStatusSummary(summary: StatusSummary): StatusSumm
         path: "[redacted]",
         recent: [],
       })),
+      grouped: undefined,
     },
   };
 }
@@ -116,6 +211,7 @@ export async function getStatusSummary(
     storeCache.set(storePath, store);
     return store;
   };
+
   const buildSessionRows = (
     store: Record<string, SessionEntry | undefined>,
     opts: { agentIdOverride?: string } = {},
@@ -140,10 +236,14 @@ export async function getStatusSummary(
         const parsedAgentId = parseAgentSessionKey(key)?.agentId;
         const agentId = opts.agentIdOverride ?? parsedAgentId;
 
+        const kind = classifySessionKey(key, entry);
+        const sessionType = classifySessionType(key, kind);
+
         return {
           agentId,
           key,
-          kind: classifySessionKey(key, entry),
+          kind,
+          sessionType,
           sessionId: entry?.sessionId,
           updatedAt,
           age,
@@ -186,6 +286,9 @@ export async function getStatusSummary(
   const recent = allSessions.slice(0, 10);
   const totalSessions = allSessions.length;
 
+  // Group sessions by type for better UX
+  const grouped = groupSessions(allSessions);
+
   const summary: StatusSummary = {
     linkChannel: linkContext
       ? {
@@ -210,7 +313,9 @@ export async function getStatusSummary(
       },
       recent,
       byAgent,
+      grouped,
     },
   };
+
   return includeSensitive ? summary : redactSensitiveStatusSummary(summary);
 }
