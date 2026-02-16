@@ -84,9 +84,11 @@ export class VectorIndex implements VectorIndexInterface {
   }
 }
 
-// Lazy-loaded hnswlib module
+// Lazy-loaded hnswlib module (untyped, so `any` is appropriate)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped optional dependency
 let hnswlibModule: any = null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped optional dependency
 function getHnswlib(): any {
   if (!hnswlibModule) {
     try {
@@ -108,6 +110,7 @@ function getHnswlib(): any {
  * Uses hnswlib-node for the underlying implementation.
  */
 export class HnswIndex implements VectorIndexInterface {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped hnswlib-node index
   private index: any = null;
   private readonly idToLabel = new Map<string, number>();
   private readonly labelToId = new Map<number, string>();

@@ -200,7 +200,11 @@ export const memoryContextConfigSchema = {
     const embeddingModel =
       cfg.embeddingModel === undefined
         ? DEFAULT_EMBEDDING_MODEL
-        : assertEnum(cfg.embeddingModel, ["auto", "gemini", "hash", "transformer"], "embeddingModel");
+        : assertEnum(
+            cfg.embeddingModel,
+            ["auto", "gemini", "hash", "transformer"],
+            "embeddingModel",
+          );
 
     const embeddingModelName =
       typeof cfg.embeddingModelName === "string"

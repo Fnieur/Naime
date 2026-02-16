@@ -7,7 +7,7 @@
  */
 
 import type { ExtractedFact } from "./knowledge-extractor.js";
-import { KnowledgeStore, type KnowledgeFact, type KnowledgeFactType } from "./knowledge-store.js";
+import { KnowledgeStore, type KnowledgeFact } from "./knowledge-store.js";
 
 export type UpdateAction =
   | { op: "ADD"; fact: ExtractedFact }

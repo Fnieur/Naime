@@ -124,7 +124,7 @@ export function loadVectors(filePath: string): {
     if (offset + dim * 4 > buf.length) {
       break;
     }
-    const vector: number[] = new Array(dim);
+    const vector: number[] = Array.from({ length: dim });
     for (let j = 0; j < dim; j++) {
       vector[j] = buf.readFloatLE(offset);
       offset += 4;

@@ -12,9 +12,7 @@ import { join } from "node:path";
  * 5. Simulate multiple compactions
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  archiveCompactedMessages,
-} from "../../../../src/agents/memory-context/compaction-bridge.js";
+import { archiveCompactedMessages } from "../../../../src/agents/memory-context/compaction-bridge.js";
 import { createEmbeddingProvider } from "../../../../src/agents/memory-context/embedding.js";
 import { KnowledgeStore } from "../../../../src/agents/memory-context/knowledge-store.js";
 import { buildRecalledContextBlock } from "../../../../src/agents/memory-context/recall-format.js";

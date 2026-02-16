@@ -2,6 +2,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import {
   createEmbeddingProvider as createUnifiedEmbeddingProvider,
   type EmbeddingProvider as UnifiedEmbeddingProvider,
+  type EmbeddingProviderRequest,
   type EmbeddingProviderResult,
 } from "../../memory/embeddings.js";
 
@@ -98,11 +99,12 @@ export async function createEmbeddingProvider(
   type: "gemini" | "transformer" | "hash" | "auto",
   logger?: { warn: (msg: string) => void; info?: (msg: string) => void },
 ): Promise<EmbeddingProvider> {
-  // Map memory-context types to unified provider types
-  const providerMap: Record<string, "auto" | "gemini" | "transformer"> = {
+  // Map memory-context types to unified provider types.
+  // "transformer" maps to "local" which uses the local ONNX embedding model.
+  const providerMap: Record<string, EmbeddingProviderRequest> = {
     gemini: "auto", // "gemini" in memory-context means "best available" — use auto
     auto: "auto",
-    transformer: "transformer",
+    transformer: "local",
   };
 
   // Hash is a special case — not part of the unified system.
@@ -119,8 +121,7 @@ export async function createEmbeddingProvider(
       config: cfg ?? ({} as OpenClawConfig),
       provider: unifiedProvider,
       model: "", // auto-detect
-      fallback: unifiedProvider === "transformer" ? "none" : "transformer",
-      transformer: {},
+      fallback: unifiedProvider === "local" ? "none" : "local",
     });
 
     if (result.fallbackReason) {
@@ -130,7 +131,9 @@ export async function createEmbeddingProvider(
     // If unified system exhausted all providers → noop, use hash instead.
     // Hash provides n-gram vector similarity which is better than noop (BM25-only).
     if (result.provider.id === "none") {
-      logger?.info?.("[memory-context] embedding: using hash (keyword overlap, no semantic search)");
+      logger?.info?.(
+        "[memory-context] embedding: using hash (keyword overlap, no semantic search)",
+      );
       return createHashEmbedding(384);
     }
 
@@ -159,7 +162,7 @@ function createHashEmbedding(dim: number): EmbeddingProvider {
         .replace(/\s+/g, " ")
         .replace(/[^\p{L}\p{N}\s@.+-]/gu, " ")
         .trim();
-      const vec = new Array<number>(dim).fill(0);
+      const vec = Array.from({ length: dim }, () => 0);
       const ngram = 3;
 
       // Generate character n-grams
@@ -181,10 +184,14 @@ function createHashEmbedding(dim: number): EmbeddingProvider {
 
       // Normalize to unit length
       let norm = 0;
-      for (const v of vec) {norm += v * v;}
+      for (const v of vec) {
+        norm += v * v;
+      }
       norm = Math.sqrt(norm);
       if (norm > 0) {
-        for (let i = 0; i < vec.length; i++) {vec[i] /= norm;}
+        for (let i = 0; i < vec.length; i++) {
+          vec[i] /= norm;
+        }
       }
       return vec;
     },

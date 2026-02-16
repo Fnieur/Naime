@@ -186,11 +186,11 @@ export default function memoryContextRecallExtension(api: ExtensionAPI): void {
                 }
                 const archivedText = maybeRedact(cleanedText, runtime.config.redaction);
                 // Check if already archived (dedup)
-                if (runtime.rawStore.isArchived(role as "user" | "assistant", archivedText)) {
+                if (runtime.rawStore.isArchived(role, archivedText)) {
                   continue;
                 }
                 await runtime.rawStore.addSegmentLite({
-                  role: role as "user" | "assistant",
+                  role,
                   content: archivedText,
                 });
               }
