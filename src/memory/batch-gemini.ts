@@ -36,6 +36,22 @@ export type GeminiBatchOutputLine = {
 };
 
 const GEMINI_BATCH_MAX_REQUESTS = 50000;
+/**
+ * Normalize Gemini batch state values.
+ * The API may return prefixed values like "BATCH_STATE_SUCCEEDED" or "JOB_STATE_RUNNING"
+ * while our code expects unprefixed values like "SUCCEEDED" or "RUNNING".
+ * Also handles the case where state is in metadata.state instead of status.state.
+ */
+function normalizeGeminiBatchState(status: GeminiBatchStatus): string {
+  const rawState = status.metadata?.state ?? status.state ?? "UNKNOWN";
+  if (rawState.startsWith("BATCH_STATE_")) {
+    return rawState.replace("BATCH_STATE_", "");
+  }
+  if (rawState.startsWith("JOB_STATE_")) {
+    return rawState.replace("JOB_STATE_", "");
+  }
+  return rawState;
+}
 function getGeminiUploadUrl(baseUrl: string): string {
   if (baseUrl.includes("/v1beta")) {
     return baseUrl.replace(/\/v1beta\/?$/, "/upload/v1beta");
