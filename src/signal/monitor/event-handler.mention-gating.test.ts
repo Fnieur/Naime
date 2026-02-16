@@ -4,8 +4,9 @@ import type { MsgContext } from "../../auto-reply/templating.js";
 import type { OpenClawConfig } from "../../config/types.js";
 import { createBaseSignalEventHandlerDeps } from "./event-handler.test-harness.js";
 
-type SignalMsgContext = Pick<MsgContext, "Body" | "WasMentioned"> & {
+type SignalMsgContext = Pick<MsgContext, "Body" | "BodyForCommands" | "WasMentioned"> & {
   Body?: string;
+  BodyForCommands?: string;
   WasMentioned?: boolean;
 };
 
@@ -23,12 +24,26 @@ vi.mock("../../auto-reply/dispatch.js", async (importOriginal) => {
 });
 
 import { createSignalEventHandler } from "./event-handler.js";
-import { renderSignalMentions } from "./mentions.js";
+import { renderSignalMentions, renderSignalMentionsWithShifts } from "./mentions.js";
 
 type GroupEventOpts = {
   message?: string;
   attachments?: unknown[];
   quoteText?: string;
+  contacts?: Array<{
+    name?: { display?: string };
+    phone?: Array<{ value?: string }>;
+    email?: Array<{ value?: string }>;
+    organization?: string;
+  }>;
+  pollCreate?: { question?: string; options?: string[]; allowMultiple?: boolean };
+  pollVote?: { targetSentTimestamp?: number; optionIndexes?: number[] };
+  pollTerminate?: { targetSentTimestamp?: number };
+  textStyles?: Array<{
+    style?: string;
+    start?: number;
+    length?: number;
+  }> | null;
   mentions?: Array<{
     uuid?: string;
     number?: string;
@@ -49,6 +64,11 @@ function makeGroupEvent(opts: GroupEventOpts) {
           message: opts.message ?? "",
           attachments: opts.attachments ?? [],
           quote: opts.quoteText ? { text: opts.quoteText } : undefined,
+          contacts: opts.contacts ?? undefined,
+          pollCreate: opts.pollCreate ?? undefined,
+          pollVote: opts.pollVote ?? undefined,
+          pollTerminate: opts.pollTerminate ?? undefined,
+          textStyles: opts.textStyles ?? undefined,
           mentions: opts.mentions ?? undefined,
           groupInfo: { groupId: "g1", groupName: "Test Group" },
         },
@@ -155,6 +175,26 @@ describe("signal mention gating", () => {
     await expectSkippedGroupHistory({ message: "", quoteText: "quoted context" }, "quoted context");
   });
 
+  it("records shared contact placeholder in pending history for skipped contact-only group messages", async () => {
+    await expectSkippedGroupHistory(
+      {
+        message: "",
+        contacts: [{ name: { display: "Jane Doe" }, phone: [{ value: "+15551234567" }] }],
+      },
+      "<media:contact>",
+    );
+  });
+
+  it("records poll vote placeholder in pending history for skipped poll-vote-only group messages", async () => {
+    await expectSkippedGroupHistory(
+      {
+        message: "",
+        pollVote: { targetSentTimestamp: 1700000000000, optionIndexes: [0] },
+      },
+      "[Poll vote]",
+    );
+  });
+
   it("bypasses mention gating for authorized control commands", async () => {
     capturedCtx = undefined;
     const handler = createSignalEventHandler(
@@ -165,6 +205,24 @@ describe("signal mention gating", () => {
 
     await handler(makeGroupEvent({ message: "/help" }));
     expect(capturedCtx).toBeTruthy();
+  });
+
+  it("detects control commands even when text style markers wrap the command", async () => {
+    capturedCtx = undefined;
+    const handler = createSignalEventHandler(
+      createBaseSignalEventHandlerDeps({
+        cfg: createSignalConfig({ requireMention: true }),
+      }),
+    );
+
+    await handler(
+      makeGroupEvent({
+        message: "/help",
+        textStyles: [{ style: "BOLD", start: 0, length: 5 }],
+      }),
+    );
+    expect(capturedCtx).toBeTruthy();
+    expect(getCapturedCtx()?.BodyForCommands).toBe("/help");
   });
 
   it("hydrates mention placeholders before trimming so offsets stay aligned", async () => {
@@ -249,5 +307,18 @@ describe("renderSignalMentions", () => {
     ]);
 
     expect(normalized).toBe("@valid hi");
+  });
+});
+
+describe("renderSignalMentionsWithShifts", () => {
+  it("returns shift metadata for downstream style-offset adjustment", () => {
+    const PLACEHOLDER = "\uFFFC";
+    const message = `${PLACEHOLDER} ping`;
+    const result = renderSignalMentionsWithShifts(message, [
+      { uuid: "abc-123", start: 0, length: 1 },
+    ]);
+
+    expect(result.text).toBe("@abc-123 ping");
+    expect(result.offsetShifts.size).toBe(1);
   });
 });

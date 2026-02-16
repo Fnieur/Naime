@@ -16,6 +16,10 @@ export function buildInboundMetaSystemPrompt(ctx: TemplateContext): string {
   const messageId = safeTrim(ctx.MessageSid);
   const messageIdFull = safeTrim(ctx.MessageSidFull);
   const replyToId = safeTrim(ctx.ReplyToId);
+  const editTargetId =
+    typeof ctx.EditTargetTimestamp === "number" && Number.isFinite(ctx.EditTargetTimestamp)
+      ? String(ctx.EditTargetTimestamp)
+      : undefined;
   const chatId = safeTrim(ctx.OriginatingTo);
 
   // Keep system metadata strictly free of attacker-controlled strings (sender names, group subjects, etc.).
@@ -27,6 +31,7 @@ export function buildInboundMetaSystemPrompt(ctx: TemplateContext): string {
     sender_id: safeTrim(ctx.SenderId),
     chat_id: chatId,
     reply_to_id: replyToId,
+    edit_target_id: editTargetId,
     channel: safeTrim(ctx.OriginatingChannel) ?? safeTrim(ctx.Surface) ?? safeTrim(ctx.Provider),
     provider: safeTrim(ctx.Provider),
     surface: safeTrim(ctx.Surface),
@@ -35,6 +40,7 @@ export function buildInboundMetaSystemPrompt(ctx: TemplateContext): string {
       is_group_chat: !isDirect ? true : undefined,
       was_mentioned: ctx.WasMentioned === true ? true : undefined,
       has_reply_context: Boolean(ctx.ReplyToBody),
+      has_edit_context: Boolean(editTargetId),
       has_forwarded_context: Boolean(ctx.ForwardedFrom),
       has_thread_starter: Boolean(safeTrim(ctx.ThreadStarterBody)),
       history_count: Array.isArray(ctx.InboundHistory) ? ctx.InboundHistory.length : 0,
@@ -129,6 +135,17 @@ export function buildInboundUserContextPrefix(ctx: TemplateContext): string {
           null,
           2,
         ),
+        "```",
+      ].join("\n"),
+    );
+  }
+
+  if (ctx.EditOriginalBody) {
+    blocks.push(
+      [
+        "Edited message original body (untrusted, for context):",
+        "```json",
+        JSON.stringify({ body: ctx.EditOriginalBody }, null, 2),
         "```",
       ].join("\n"),
     );

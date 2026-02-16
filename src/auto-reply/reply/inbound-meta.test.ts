@@ -114,6 +114,39 @@ describe("buildInboundMetaSystemPrompt", () => {
     expect(payload["message_id"]).toBe("short-id");
     expect(payload["message_id_full"]).toBe("full-provider-message-id");
   });
+
+  it("includes edit_target_id when edit context is provided", () => {
+    const prompt = buildInboundMetaSystemPrompt({
+      MessageSid: "1700000000999",
+      EditTargetTimestamp: 1700000000111,
+      OriginatingTo: "signal:+15551234567",
+      OriginatingChannel: "signal",
+      Provider: "signal",
+      Surface: "signal",
+      ChatType: "direct",
+    } as TemplateContext);
+
+    const payload = parseInboundMetaPayload(prompt);
+    const flags = payload["flags"] as Record<string, unknown>;
+    expect(payload["edit_target_id"]).toBe("1700000000111");
+    expect(flags["has_edit_context"]).toBe(true);
+  });
+
+  it("omits edit_target_id when edit context is absent", () => {
+    const prompt = buildInboundMetaSystemPrompt({
+      MessageSid: "1700000000999",
+      OriginatingTo: "signal:+15551234567",
+      OriginatingChannel: "signal",
+      Provider: "signal",
+      Surface: "signal",
+      ChatType: "direct",
+    } as TemplateContext);
+
+    const payload = parseInboundMetaPayload(prompt);
+    const flags = payload["flags"] as Record<string, unknown>;
+    expect(payload["edit_target_id"]).toBeUndefined();
+    expect(flags["has_edit_context"]).toBe(false);
+  });
 });
 
 describe("buildInboundUserContextPrefix", () => {
@@ -164,5 +197,14 @@ describe("buildInboundUserContextPrefix", () => {
 
     const conversationInfo = parseConversationInfoPayload(text);
     expect(conversationInfo["sender"]).toBe("user@example.com");
+  });
+
+  it("includes edited original body in untrusted context", () => {
+    const text = buildInboundUserContextPrefix({
+      EditOriginalBody: "original message before edit",
+    } as TemplateContext);
+
+    expect(text).toContain("Edited message original body (untrusted, for context):");
+    expect(text).toContain('"body": "original message before edit"');
   });
 });
