@@ -10,7 +10,7 @@ import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ParentBasedSampler, TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
 import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
-import { onDiagnosticEvent, registerLogTransport } from "openclaw/plugin-sdk";
+import { onDiagnosticEvent, redactSensitiveText, registerLogTransport } from "openclaw/plugin-sdk";
 
 const DEFAULT_SERVICE_NAME = "openclaw";
 
@@ -312,11 +312,19 @@ export function createDiagnosticsOtelService(): OpenClawPluginService {
             attributes["openclaw.code.location"] = meta.path.filePathWithLine;
           }
 
+          // Redact sensitive data before exporting to external OTEL collector (CWE-532)
+          const redactedMessage = redactSensitiveText(message);
+          const redactedAttributes: Record<string, string | number | boolean> = {};
+          for (const [key, value] of Object.entries(attributes)) {
+            redactedAttributes[key] =
+              typeof value === "string" ? redactSensitiveText(value) : value;
+          }
+
           otelLogger.emit({
-            body: message,
+            body: redactedMessage,
             severityText: logLevelName,
             severityNumber,
-            attributes,
+            attributes: redactedAttributes,
             timestamp: meta?.date ?? new Date(),
           });
         });
