@@ -669,7 +669,7 @@ Z.AI GLM-4.x models automatically enable thinking mode unless you set `--thinkin
 
 ### `agents.defaults.cliBackends`
 
-Optional CLI backends for text-only fallback runs (no tool calls). Useful as a backup when API providers fail.
+Optional CLI backends for text-only runs (no tool calls). You can use them as a primary model path or as fallback when API providers fail.
 
 ```json5
 {
@@ -698,6 +698,8 @@ Optional CLI backends for text-only fallback runs (no tool calls). Useful as a b
 ```
 
 - CLI backends are text-first; tools are always disabled.
+- Set `agents.defaults.model.primary` to `claude-cli/...` (or another CLI provider) to use a CLI backend as your primary model path.
+- Or keep API models primary and add CLI models under `agents.defaults.model.fallbacks`.
 - Sessions supported when `sessionArg` is set.
 - Image pass-through supported when `imageArg` accepts file paths.
 
