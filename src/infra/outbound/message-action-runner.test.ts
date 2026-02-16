@@ -598,6 +598,30 @@ describe("runMessageAction sandboxed media validation", () => {
       }),
     ).rejects.toThrow(/data:/i);
   });
+
+  it("allows media paths under os.tmpdir()", async () => {
+    const sandboxDir = await fs.mkdtemp(path.join(os.tmpdir(), "msg-sandbox-"));
+    try {
+      const tmpFile = path.join(os.tmpdir(), "test-media-image.png");
+      const result = await runMessageAction({
+        cfg: slackConfig,
+        action: "send",
+        params: {
+          channel: "slack",
+          target: "#C12345678",
+          media: tmpFile,
+          message: "",
+        },
+        sandboxRoot: sandboxDir,
+        dryRun: true,
+      });
+
+      expect(result.kind).toBe("send");
+      expect(result.sendResult?.mediaUrl).toBe(tmpFile);
+    } finally {
+      await fs.rm(sandboxDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("runMessageAction media caption behavior", () => {
