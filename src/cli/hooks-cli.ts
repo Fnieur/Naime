@@ -26,6 +26,7 @@ import { renderTable } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
 import { resolveUserPath, shortenHomePath } from "../utils.js";
 import { formatCliCommand } from "./command-format.js";
+import { addJsonOption } from "./option-builders.js";
 
 export type HooksListOptions = {
   json?: boolean;
@@ -463,58 +464,57 @@ export function registerHooksCli(program: Command): void {
         `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/hooks", "docs.openclaw.ai/cli/hooks")}\n`,
     );
 
-  hooks
-    .command("list")
-    .description("List all hooks")
-    .option("--eligible", "Show only eligible hooks", false)
-    .option("--json", "Output as JSON", false)
-    .option("-v, --verbose", "Show more details including missing requirements", false)
-    .action(async (opts) => {
-      try {
-        const config = loadConfig();
-        const report = buildHooksReport(config);
-        defaultRuntime.log(formatHooksList(report, opts));
-      } catch (err) {
-        defaultRuntime.error(
-          `${theme.error("Error:")} ${err instanceof Error ? err.message : String(err)}`,
-        );
-        process.exit(1);
-      }
-    });
+  addJsonOption(
+    hooks
+      .command("list")
+      .description("List all hooks")
+      .option("--eligible", "Show only eligible hooks", false)
+      .option("-v, --verbose", "Show more details including missing requirements", false),
+    "Output as JSON",
+  ).action(async (opts) => {
+    try {
+      const config = loadConfig();
+      const report = buildHooksReport(config);
+      defaultRuntime.log(formatHooksList(report, opts));
+    } catch (err) {
+      defaultRuntime.error(
+        `${theme.error("Error:")} ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
+  });
 
-  hooks
-    .command("info <name>")
-    .description("Show detailed information about a hook")
-    .option("--json", "Output as JSON", false)
-    .action(async (name, opts) => {
-      try {
-        const config = loadConfig();
-        const report = buildHooksReport(config);
-        defaultRuntime.log(formatHookInfo(report, name, opts));
-      } catch (err) {
-        defaultRuntime.error(
-          `${theme.error("Error:")} ${err instanceof Error ? err.message : String(err)}`,
-        );
-        process.exit(1);
-      }
-    });
+  addJsonOption(
+    hooks.command("info <name>").description("Show detailed information about a hook"),
+    "Output as JSON",
+  ).action(async (name, opts) => {
+    try {
+      const config = loadConfig();
+      const report = buildHooksReport(config);
+      defaultRuntime.log(formatHookInfo(report, name, opts));
+    } catch (err) {
+      defaultRuntime.error(
+        `${theme.error("Error:")} ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
+  });
 
-  hooks
-    .command("check")
-    .description("Check hooks eligibility status")
-    .option("--json", "Output as JSON", false)
-    .action(async (opts) => {
-      try {
-        const config = loadConfig();
-        const report = buildHooksReport(config);
-        defaultRuntime.log(formatHooksCheck(report, opts));
-      } catch (err) {
-        defaultRuntime.error(
-          `${theme.error("Error:")} ${err instanceof Error ? err.message : String(err)}`,
-        );
-        process.exit(1);
-      }
-    });
+  addJsonOption(
+    hooks.command("check").description("Check hooks eligibility status"),
+    "Output as JSON",
+  ).action(async (opts) => {
+    try {
+      const config = loadConfig();
+      const report = buildHooksReport(config);
+      defaultRuntime.log(formatHooksCheck(report, opts));
+    } catch (err) {
+      defaultRuntime.error(
+        `${theme.error("Error:")} ${err instanceof Error ? err.message : String(err)}`,
+      );
+      process.exit(1);
+    }
+  });
 
   hooks
     .command("enable <name>")
