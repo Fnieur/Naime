@@ -356,10 +356,25 @@ export async function authorizeGatewayConnect(params: {
       limiter?.recordFailure(ip, rateLimitScope);
       return { ok: false, reason: "token_missing" };
     }
-    if (!safeEqualSecret(connectAuth.token, auth.token)) {
+
+    // Check if the provided token matches the Master Token
+    const isMasterTokenValid = safeEqualSecret(connectAuth.token, auth.token);
+
+    if (isMasterTokenValid) {
+      // NEW: If the Master Token is valid AND it's a local/tunnel connection, 
+      // we trust it immediately to prevent the 1008 "device token mismatch" loop.
+      if (localDirect || (ip && isLoopbackAddress(ip))) {
+        limiter?.reset(ip, rateLimitScope);
+        return { ok: true, method: "token", user: "admin-local" };
+      }
+    }
+
+    // Fallback to strict check for non-local connections
+    if (!isMasterTokenValid) {
       limiter?.recordFailure(ip, rateLimitScope);
       return { ok: false, reason: "token_mismatch" };
     }
+
     limiter?.reset(ip, rateLimitScope);
     return { ok: true, method: "token" };
   }
