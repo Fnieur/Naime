@@ -97,8 +97,8 @@ export function createSessionsSpawnTool(opts?: {
         to: opts?.agentTo,
         threadId: opts?.agentThreadId,
       });
-      // Default to 0 (no timeout) when omitted. Sub-agent runs are long-lived
-      // by default and should not inherit the main agent 600s timeout.
+      // Omitted timeout inherits the configured agent default. Explicit 0 keeps
+      // no-timeout behavior for callers that intentionally want it.
       const timeoutSecondsCandidate =
         typeof params.runTimeoutSeconds === "number"
           ? params.runTimeoutSeconds
@@ -108,7 +108,7 @@ export function createSessionsSpawnTool(opts?: {
       const runTimeoutSeconds =
         typeof timeoutSecondsCandidate === "number" && Number.isFinite(timeoutSecondsCandidate)
           ? Math.max(0, Math.floor(timeoutSecondsCandidate))
-          : 0;
+          : undefined;
       let modelWarning: string | undefined;
       let modelApplied = false;
 
