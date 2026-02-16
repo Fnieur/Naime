@@ -139,6 +139,16 @@ export async function createEmbeddingProvider(
 
     const adapter = wrapUnifiedProvider(result.provider, logger);
     await adapter.init?.();
+
+    // If probe failed (e.g. Gemini region restriction), dim stays 0.
+    // Fall back to hash embedding to avoid VectorIndex: invalid dim 0.
+    if (adapter.dim <= 0) {
+      logger?.warn?.(
+        `[memory-context] embedding dim=0 after probe (provider=${adapter.name}), falling back to hash`,
+      );
+      return createHashEmbedding(384);
+    }
+
     return adapter;
   } catch (err) {
     logger?.warn?.(
