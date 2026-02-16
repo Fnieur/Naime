@@ -2104,3 +2104,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===========================================
+   Status chip utility
+   =========================================== */
+
+.status-chip {
+  width: 54px;
+  text-align: center;
+}
