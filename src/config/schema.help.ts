@@ -290,7 +290,8 @@ export const FIELD_HELP: Record<string, string> = {
   "agents.defaults.imageModel.primary":
     "Optional image model (provider/model) used when the primary model lacks image input.",
   "agents.defaults.imageModel.fallbacks": "Ordered fallback image models (provider/model).",
-  "agents.defaults.cliBackends": "Optional CLI backends for text-only fallback (claude-cli, etc.).",
+  "agents.defaults.cliBackends":
+    "Optional CLI backends for text-first provider routing (primary or fallback; claude-cli, etc.).",
   "agents.defaults.humanDelay.mode": 'Delay style for block replies ("off", "natural", "custom").',
   "agents.defaults.humanDelay.minMs": "Minimum delay in ms for custom humanDelay (default: 800).",
   "agents.defaults.humanDelay.maxMs": "Maximum delay in ms for custom humanDelay (default: 2500).",
