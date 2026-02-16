@@ -369,7 +369,6 @@ describe("buildAgentSystemPrompt", () => {
     );
   });
 
-
   it("summarizes the message tool when available", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
