@@ -82,6 +82,71 @@ describe("tool image sanitizing", () => {
     expect(image.mimeType).toBe("image/jpeg");
   }, 20_000);
 
+  it("rejects invalid base64 data gracefully", async () => {
+    const blocks = [
+      {
+        type: "image" as const,
+        data: "not-valid-base64!!!@#$%",
+        mimeType: "image/png",
+      },
+    ];
+
+    const out = await sanitizeContentBlocksImages(blocks, "test");
+    expect(out.length).toBe(1);
+    expect(out[0].type).toBe("text");
+    if (out[0].type === "text") {
+      expect(out[0].text).toContain("invalid base64");
+    }
+  });
+
+  it("strips data URL prefix and processes the image", async () => {
+    const jpeg = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 3,
+        background: { r: 0, g: 255, b: 0 },
+      },
+    })
+      .jpeg()
+      .toBuffer();
+
+    const rawBase64 = jpeg.toString("base64");
+    const blocks = [
+      {
+        type: "image" as const,
+        data: `data:image/jpeg;base64,${rawBase64}`,
+        mimeType: "image/jpeg",
+      },
+    ];
+
+    const out = await sanitizeContentBlocksImages(blocks, "test");
+    const image = out.find((b) => b.type === "image");
+    if (!image || image.type !== "image") {
+      throw new Error("expected image block");
+    }
+    // The data URL prefix should be stripped — the output should be raw base64
+    expect(image.data).not.toContain("data:");
+    expect(image.mimeType).toBe("image/jpeg");
+  });
+
+  it("rejects empty base64 data", async () => {
+    const blocks = [
+      {
+        type: "image" as const,
+        data: "   ",
+        mimeType: "image/png",
+      },
+    ];
+
+    const out = await sanitizeContentBlocksImages(blocks, "test");
+    expect(out.length).toBe(1);
+    expect(out[0].type).toBe("text");
+    if (out[0].type === "text") {
+      expect(out[0].text).toContain("omitted empty image");
+    }
+  });
+
   it("corrects mismatched jpeg mimeType", async () => {
     const jpeg = await sharp({
       create: {
