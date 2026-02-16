@@ -1,0 +1,25 @@
+{
+  "id": "clickup",
+  "name": "ClickUp",
+  "description": "ClickUp project management tools: teams, spaces, lists, tasks, comments.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "accessToken": {
+        "type": "string",
+        "description": "ClickUp personal API token (pk_... or numeric_hash)."
+      },
+      "defaultTeamId": {
+        "type": "string",
+        "description": "Default team/workspace ID to avoid listing teams each time."
+      },
+      "timeoutMs": {
+        "type": "number",
+        "minimum": 1000,
+        "description": "HTTP timeout in milliseconds."
+      }
+    },
+    "required": ["accessToken"]
+  }
+}
