@@ -150,11 +150,8 @@ export const spixiPlugin: ChannelPlugin<ResolvedSpixiAccount> = {
         client.subscribe("AcceptAdd2");
       });
 
-      client.on("message", async (topic: string, message: mqtt.Packet) => {
-        const msgStr = message;
-        let data: unknown;
-        try {
-          data = JSON.parse(msgStr);
+      client.on("message", async (topic: string, message: Buffer) => {
+        const msgStr = message.toString();
         } catch {
           log?.warn(`[${account.accountId}] Received invalid JSON on ${topic}`);
           return;
