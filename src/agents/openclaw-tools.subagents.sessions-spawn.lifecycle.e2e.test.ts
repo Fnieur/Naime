@@ -140,6 +140,45 @@ describe("openclaw-tools: subagents (sessions_spawn lifecycle)", () => {
     resetSessionsSpawnConfigOverride();
   });
 
+  it("sessions_spawn uses default timeout when runTimeoutSeconds is omitted", async () => {
+    resetSubagentRegistryForTests();
+    callGatewayMock.mockReset();
+
+    const ctx = setupSessionsSpawnGatewayMock({
+      includeSessionsList: true,
+      includeChatHistory: true,
+      onAgentSubagentSpawn: (params) => {
+        const rec = params as { timeout?: number } | undefined;
+        expect(rec?.timeout).toBeUndefined();
+      },
+    });
+
+    const tool = await getSessionsSpawnTool({
+      agentSessionKey: "main",
+      agentChannel: "whatsapp",
+    });
+
+    const result = await tool.execute("call-default-timeout", {
+      task: "do thing",
+    });
+    expect(result.details).toMatchObject({
+      status: "accepted",
+      runId: "run-1",
+    });
+
+    const child = ctx.getChild();
+    if (!child.runId) {
+      throw new Error("missing child runId");
+    }
+
+    await waitFor(() => ctx.waitCalls.some((call) => call.runId === child.runId));
+    const childWait = ctx.waitCalls.find((call) => call.runId === child.runId);
+    expect(childWait?.timeoutMs).toBe(600_000);
+    // Allow the follow-up announce flow to complete so it does not bleed into
+    // subsequent lifecycle tests.
+    await waitFor(() => ctx.calls.filter((call) => call.method === "agent").length >= 2);
+  });
+
   it("sessions_spawn runs cleanup flow after subagent completion", async () => {
     resetSubagentRegistryForTests();
     callGatewayMock.mockReset();
