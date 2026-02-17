@@ -17,7 +17,7 @@ import { createReplyPrefixOptions } from "../channels/reply-prefix.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { ChannelGroupPolicy } from "../config/group-policy.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";
-import { resolveTelegramCustomCommands } from "../config/telegram-custom-commands.js";
+import { normalizeTelegramCommandName, resolveTelegramCustomCommands } from "../config/telegram-custom-commands.js";
 import type {
   ReplyToMode,
   TelegramAccountConfig,
@@ -339,7 +339,7 @@ export const registerTelegramNativeCommands = ({
   }
   const allCommandsFull: Array<{ command: string; description: string }> = [
     ...nativeCommands.map((command) => ({
-      command: command.name,
+      command: normalizeTelegramCommandName(command.name),
       description: command.description,
     })),
     ...(nativeEnabled ? pluginCatalog.commands : []),
