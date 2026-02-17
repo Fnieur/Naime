@@ -16,7 +16,7 @@ vi.mock("../../globals.js", () => ({
   logVerbose: () => {},
 }));
 
-const { resolveDiscordMessageChannelId, resolveForwardedMediaList } =
+const { resolveDiscordMessageChannelId, resolveDiscordMessageText, resolveForwardedMediaList } =
   await import("./message-utils.js");
 
 function asMessage(payload: Record<string, unknown>): Message {
@@ -120,5 +120,51 @@ describe("resolveForwardedMediaList", () => {
 
     expect(result).toEqual([]);
     expect(fetchRemoteMedia).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveDiscordMessageText", () => {
+  it("returns trimmed content when present", () => {
+    const result = resolveDiscordMessageText(asMessage({ content: "  hello  " }));
+    expect(result).toBe("hello");
+  });
+
+  it("returns empty string when content is undefined", () => {
+    const result = resolveDiscordMessageText(asMessage({}));
+    expect(result).toBe("");
+  });
+
+  it("returns empty string when content is null", () => {
+    const result = resolveDiscordMessageText(asMessage({ content: null }));
+    expect(result).toBe("");
+  });
+
+  it("returns empty string when content is a number (non-string)", () => {
+    const result = resolveDiscordMessageText(asMessage({ content: 42 }));
+    expect(result).toBe("");
+  });
+
+  it("falls back to embed description", () => {
+    const result = resolveDiscordMessageText(
+      asMessage({ embeds: [{ description: "embed text" }] }),
+    );
+    expect(result).toBe("embed text");
+  });
+
+  it("skips non-string embed description", () => {
+    const result = resolveDiscordMessageText(asMessage({ embeds: [{ description: undefined }] }));
+    expect(result).toBe("");
+  });
+
+  it("falls back to fallbackText", () => {
+    const result = resolveDiscordMessageText(asMessage({}), { fallbackText: "  fallback  " });
+    expect(result).toBe("fallback");
+  });
+
+  it("skips non-string fallbackText", () => {
+    const result = resolveDiscordMessageText(asMessage({}), {
+      fallbackText: undefined,
+    });
+    expect(result).toBe("");
   });
 });
