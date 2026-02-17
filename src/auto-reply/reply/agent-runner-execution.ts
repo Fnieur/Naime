@@ -394,6 +394,7 @@ export async function runAgentTurnWithFallback(params: {
                     await onToolResult({
                       text,
                       mediaUrls: payload.mediaUrls,
+                      audioAsVoice: payload.audioAsVoice,
                     });
                   })()
                     .catch((err) => {
