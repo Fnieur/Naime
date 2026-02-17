@@ -624,6 +624,8 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
         maxLinesPerMessage: discordConfig?.maxLinesPerMessage,
         tableMode,
         chunkMode: resolveChunkMode(cfg, "discord", accountId),
+        // Guild/group channel replies are sent as silent notifications to reduce mobile push spam.
+        silent: !isDirectMessage,
       });
       replyReference.markSent();
     },

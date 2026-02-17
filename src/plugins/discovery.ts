@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { PluginDiagnostic, PluginOrigin } from "./types.js";
 import { resolveConfigDir, resolveUserPath } from "../utils.js";
 import { resolveBundledPluginsDir } from "./bundled-dir.js";
 import {
@@ -7,7 +8,6 @@ import {
   type OpenClawPackageManifest,
   type PackageManifest,
 } from "./manifest.js";
-import type { PluginDiagnostic, PluginOrigin } from "./types.js";
 
 const EXTENSION_EXTS = new Set([".ts", ".js", ".mts", ".cts", ".mjs", ".cjs"]);
 
@@ -112,6 +112,29 @@ function addCandidate(params: {
   });
 }
 
+function resolveDirentKind(
+  entry: fs.Dirent,
+  fullPath: string,
+): {
+  isFile: boolean;
+  isDirectory: boolean;
+} {
+  let isFile = entry.isFile();
+  let isDirectory = entry.isDirectory();
+
+  if (!isFile && !isDirectory) {
+    try {
+      const stats = fs.statSync(fullPath);
+      isFile = stats.isFile();
+      isDirectory = stats.isDirectory();
+    } catch {
+      // Broken symlink, inaccessible target, or unknown dirent type.
+    }
+  }
+
+  return { isFile, isDirectory };
+}
+
 function discoverInDirectory(params: {
   dir: string;
   origin: PluginOrigin;
@@ -137,7 +160,9 @@ function discoverInDirectory(params: {
 
   for (const entry of entries) {
     const fullPath = path.join(params.dir, entry.name);
-    if (entry.isFile()) {
+    const kind = resolveDirentKind(entry, fullPath);
+
+    if (kind.isFile) {
       if (!isExtensionFile(fullPath)) {
         continue;
       }
@@ -151,7 +176,7 @@ function discoverInDirectory(params: {
         workspaceDir: params.workspaceDir,
       });
     }
-    if (!entry.isDirectory()) {
+    if (!kind.isDirectory) {
       continue;
     }
 

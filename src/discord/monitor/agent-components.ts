@@ -891,6 +891,8 @@ async function dispatchDiscordComponentEvent(params: {
           maxLinesPerMessage: ctx.discordConfig?.maxLinesPerMessage,
           tableMode,
           chunkMode: resolveChunkMode(ctx.cfg, "discord", accountId),
+          // Keep channel component follow-ups silent to avoid push spam.
+          silent: !interactionCtx.isDirectMessage,
         });
         replyReference.markSent();
       },
