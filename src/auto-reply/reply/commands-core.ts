@@ -8,7 +8,6 @@ import { handleAllowlistCommand } from "./commands-allowlist.js";
 import { handleApproveCommand } from "./commands-approve.js";
 import { handleBashCommand } from "./commands-bash.js";
 import { handleCompactCommand } from "./commands-compact.js";
-import { handleSaveCommand, runPreResetMemoryFlush } from "./commands-save.js";
 import { handleConfigCommand, handleDebugCommand } from "./commands-config.js";
 import {
   handleCommandsListCommand,
@@ -21,6 +20,7 @@ import {
 import { handleMeshCommand } from "./commands-mesh.js";
 import { handleModelsCommand } from "./commands-models.js";
 import { handlePluginCommand } from "./commands-plugin.js";
+import { handleSaveCommand, runPreResetMemoryFlush } from "./commands-save.js";
 import {
   handleAbortTrigger,
   handleActivationCommand,
@@ -82,7 +82,9 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
   // Run pre-reset memory flush: save durable memories before the session is wiped.
   // Active when compaction.memoryFlush is enabled (default: true).
   if (resetRequested && params.command.isAuthorizedSender && params.sessionEntry?.sessionId) {
-    const memoryFlushSettings = (await import("./memory-flush.js")).resolveMemoryFlushSettings(params.cfg);
+    const memoryFlushSettings = (await import("./memory-flush.js")).resolveMemoryFlushSettings(
+      params.cfg,
+    );
     if (memoryFlushSettings) {
       const flushResult = await runPreResetMemoryFlush({
         cfg: params.cfg,
