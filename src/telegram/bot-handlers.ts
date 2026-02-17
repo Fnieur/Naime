@@ -104,6 +104,7 @@ export const registerTelegramHandlers = ({
     allMedia: TelegramMediaRef[];
     storeAllowFrom: string[];
     debounceKey: string | null;
+    isForward: boolean;
     botUsername?: string;
   };
   const buildSyntheticTextMessage = (params: {
@@ -134,6 +135,9 @@ export const registerTelegramHandlers = ({
     debounceMs,
     buildKey: (entry) => entry.debounceKey,
     shouldDebounce: (entry) => {
+      if (entry.isForward) {
+        return true;
+      }
       if (entry.allMedia.length > 0) {
         return false;
       }
@@ -156,7 +160,8 @@ export const registerTelegramHandlers = ({
         .map((entry) => entry.msg.text ?? entry.msg.caption ?? "")
         .filter(Boolean)
         .join("\n");
-      if (!combinedText.trim()) {
+      const combinedMedia = entries.flatMap((entry) => entry.allMedia);
+      if (!combinedText.trim() && combinedMedia.length === 0) {
         return;
       }
       const first = entries[0];
@@ -169,7 +174,7 @@ export const registerTelegramHandlers = ({
       const messageIdOverride = last.msg.message_id ? String(last.msg.message_id) : undefined;
       await processMessage(
         buildSyntheticContext(baseCtx, syntheticMessage),
-        [],
+        combinedMedia,
         first.storeAllowFrom,
         messageIdOverride ? { messageIdOverride } : undefined,
       );
@@ -680,8 +685,9 @@ export const registerTelegramHandlers = ({
     const senderId = msg.from?.id ? String(msg.from.id) : "";
     const conversationKey =
       resolvedThreadId != null ? `${chatId}:topic:${resolvedThreadId}` : String(chatId);
+    const isForward = Boolean((msg as { forward_origin?: unknown }).forward_origin);
     const debounceKey = senderId
-      ? `telegram:${accountId ?? "default"}:${conversationKey}:${senderId}`
+      ? `telegram:${accountId ?? "default"}:${conversationKey}:${senderId}:${isForward ? "forward" : "default"}`
       : null;
     await inboundDebouncer.enqueue({
       ctx,
@@ -689,6 +695,7 @@ export const registerTelegramHandlers = ({
       allMedia,
       storeAllowFrom,
       debounceKey,
+      isForward,
       botUsername: ctx.me?.username,
     });
   };
