@@ -79,6 +79,30 @@ describe("normalizeCronJobCreate", () => {
     expect(cleared.agentId).toBeNull();
   });
 
+  it("trims sessionKey and drops blanks", () => {
+    const normalized = normalizeCronJobCreate({
+      name: "session-key",
+      enabled: true,
+      schedule: { kind: "cron", expr: "* * * * *" },
+      sessionTarget: "main",
+      wakeMode: "next-heartbeat",
+      sessionKey: "  agent:main:discord:channel:ops  ",
+      payload: { kind: "systemEvent", text: "hi" },
+    }) as unknown as Record<string, unknown>;
+    expect(normalized.sessionKey).toBe("agent:main:discord:channel:ops");
+
+    const cleared = normalizeCronJobCreate({
+      name: "session-key-clear",
+      enabled: true,
+      schedule: { kind: "cron", expr: "* * * * *" },
+      sessionTarget: "main",
+      wakeMode: "next-heartbeat",
+      sessionKey: "   ",
+      payload: { kind: "systemEvent", text: "hi" },
+    }) as unknown as Record<string, unknown>;
+    expect("sessionKey" in cleared).toBe(false);
+  });
+
   it("canonicalizes payload.channel casing", () => {
     const normalized = normalizeCronJobCreate({
       name: "legacy provider",
@@ -276,6 +300,18 @@ describe("normalizeCronJobCreate", () => {
     expect(payload.allowUnsafeExternalContent).toBe(true);
   });
 
+  it("preserves timeoutSeconds=0 for no-timeout agentTurn payloads", () => {
+    const normalized = normalizeCronJobCreate({
+      name: "legacy no-timeout",
+      schedule: { kind: "every", everyMs: 60_000 },
+      payload: { kind: "agentTurn", message: "hello" },
+      timeoutSeconds: 0,
+    }) as unknown as Record<string, unknown>;
+
+    const payload = normalized.payload as Record<string, unknown>;
+    expect(payload.timeoutSeconds).toBe(0);
+  });
+
   it("coerces sessionTarget and wakeMode casing", () => {
     const normalized = normalizeCronJobCreate({
       name: "casing",
@@ -328,5 +364,17 @@ describe("normalizeCronJobPatch", () => {
     expect(payload.kind).toBeUndefined();
     expect(payload.channel).toBe("telegram");
     expect(payload.to).toBe("+15550001111");
+  });
+
+  it("preserves null sessionKey patches and trims string values", () => {
+    const trimmed = normalizeCronJobPatch({
+      sessionKey: "  agent:main:telegram:group:-100123  ",
+    }) as unknown as Record<string, unknown>;
+    expect(trimmed.sessionKey).toBe("agent:main:telegram:group:-100123");
+
+    const cleared = normalizeCronJobPatch({
+      sessionKey: null,
+    }) as unknown as Record<string, unknown>;
+    expect(cleared.sessionKey).toBeNull();
   });
 });
