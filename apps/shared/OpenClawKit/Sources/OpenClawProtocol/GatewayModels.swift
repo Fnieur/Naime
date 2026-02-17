@@ -2475,6 +2475,76 @@ public struct ExecApprovalResolveParams: Codable, Sendable {
     }
 }
 
+public struct ToolInterruptEmitParams: Codable, Sendable {
+    public let approvalrequestid: String
+    public let runid: String
+    public let sessionkey: String
+    public let toolcallid: String
+    public let interrupt: [String: AnyCodable]
+    public let timeoutms: Int?
+    public let twophase: Bool?
+
+    public init(
+        approvalrequestid: String,
+        runid: String,
+        sessionkey: String,
+        toolcallid: String,
+        interrupt: [String: AnyCodable],
+        timeoutms: Int?,
+        twophase: Bool?
+    ) {
+        self.approvalrequestid = approvalrequestid
+        self.runid = runid
+        self.sessionkey = sessionkey
+        self.toolcallid = toolcallid
+        self.interrupt = interrupt
+        self.timeoutms = timeoutms
+        self.twophase = twophase
+    }
+    private enum CodingKeys: String, CodingKey {
+        case approvalrequestid = "approvalRequestId"
+        case runid = "runId"
+        case sessionkey = "sessionKey"
+        case toolcallid = "toolCallId"
+        case interrupt
+        case timeoutms = "timeoutMs"
+        case twophase = "twoPhase"
+    }
+}
+
+public struct ToolInterruptResumeParams: Codable, Sendable {
+    public let approvalrequestid: String
+    public let runid: String
+    public let sessionkey: String
+    public let toolcallid: String
+    public let resumetoken: String
+    public let result: AnyCodable
+
+    public init(
+        approvalrequestid: String,
+        runid: String,
+        sessionkey: String,
+        toolcallid: String,
+        resumetoken: String,
+        result: AnyCodable
+    ) {
+        self.approvalrequestid = approvalrequestid
+        self.runid = runid
+        self.sessionkey = sessionkey
+        self.toolcallid = toolcallid
+        self.resumetoken = resumetoken
+        self.result = result
+    }
+    private enum CodingKeys: String, CodingKey {
+        case approvalrequestid = "approvalRequestId"
+        case runid = "runId"
+        case sessionkey = "sessionKey"
+        case toolcallid = "toolCallId"
+        case resumetoken = "resumeToken"
+        case result
+    }
+}
+
 public struct DevicePairListParams: Codable, Sendable {
 }
 
