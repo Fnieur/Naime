@@ -1077,3 +1077,47 @@ export async function sendPollTelegram(
 
   return { messageId, chatId: resolvedChatId, pollId };
 }
+
+export type TelegramSetProfilePhotoOpts = {
+  token?: string;
+  accountId?: string;
+  /** Local file path or URL. */
+  mediaUrl: string;
+  mediaLocalRoots?: readonly string[];
+  maxBytes?: number;
+  api?: TelegramApiOverride;
+  retry?: RetryConfig;
+  verbose?: boolean;
+};
+
+export async function setMyProfilePhotoTelegram(
+  opts: TelegramSetProfilePhotoOpts,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { cfg, account, api } = resolveTelegramApiContext(opts);
+  const requestWithDiag = createTelegramRequestWithDiag({
+    cfg,
+    account,
+    retry: opts.retry,
+    verbose: opts.verbose,
+    shouldRetry: (err) => isRecoverableTelegramNetworkError(err, { context: "setMyProfilePhoto" }),
+  });
+
+  const media = await loadWebMedia(opts.mediaUrl, {
+    maxBytes: opts.maxBytes,
+    localRoots: opts.mediaLocalRoots,
+  });
+  const fileName = media.fileName ?? "avatar.png";
+  const file = new InputFile(media.buffer, fileName);
+
+  try {
+    await requestWithDiag(() => api.setMyProfilePhoto(file), "setMyProfilePhoto");
+    recordChannelActivity({
+      channel: "telegram",
+      accountId: account.accountId,
+      direction: "outbound",
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: formatUncaughtError(err) };
+  }
+}

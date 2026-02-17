@@ -53,13 +53,14 @@ export function createMessageCliHelpers(
     ensurePluginRegistryLoaded();
     const deps = createDefaultDeps();
     let failed = false;
+    const actionOverride = typeof opts.action === "string" ? opts.action.trim() : "";
     await runCommandWithRuntime(
       defaultRuntime,
       async () => {
         await messageCommand(
           {
             ...normalizeMessageOptions(opts),
-            action,
+            action: actionOverride || action,
           },
           deps,
           defaultRuntime,

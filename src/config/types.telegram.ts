@@ -18,6 +18,8 @@ export type TelegramActionConfig = {
   editMessage?: boolean;
   /** Enable sticker actions (send and search). */
   sticker?: boolean;
+  /** Allow setting the bot profile photo. */
+  setBotAvatar?: boolean;
 };
 
 export type TelegramNetworkConfig = {

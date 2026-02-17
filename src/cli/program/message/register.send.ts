@@ -16,6 +16,10 @@ export function registerMessageSendCommand(message: Command, helpers: MessageCli
           "Attach media (image/audio/video/document). Accepts local paths or URLs.",
         )
         .option(
+          "--action <action>",
+          "Message action override (e.g., set-bot-avatar)",
+        )
+        .option(
           "--buttons <json>",
           "Telegram inline keyboard buttons as JSON (array of button rows)",
         )

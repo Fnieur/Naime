@@ -69,6 +69,9 @@ export const telegramMessageActions: ChannelMessageActionAdapter = {
       actions.add("sticker");
       actions.add("sticker-search");
     }
+    if (gate("setBotAvatar", false)) {
+      actions.add("set-bot-avatar");
+    }
     return Array.from(actions);
   },
   supportsButtons: ({ cfg }) => {
@@ -193,6 +196,18 @@ export const telegramMessageActions: ChannelMessageActionAdapter = {
           action: "searchSticker",
           query,
           limit: limit ?? undefined,
+          accountId: accountId ?? undefined,
+        },
+        cfg,
+      );
+    }
+
+    if (action === "set-bot-avatar") {
+      const mediaUrl = readStringParam(params, "media", { required: true, trim: false });
+      return await handleTelegramAction(
+        {
+          action: "setBotAvatar",
+          mediaUrl,
           accountId: accountId ?? undefined,
         },
         cfg,
