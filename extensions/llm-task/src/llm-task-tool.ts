@@ -24,12 +24,18 @@ async function loadRunEmbeddedPiAgent(): Promise<RunEmbeddedPiAgentFn> {
     // ignore
   }
 
-  // Bundled install (built)
-  const mod = await import("../../../src/agents/pi-embedded-runner.js");
-  if (typeof mod.runEmbeddedPiAgent !== "function") {
-    throw new Error("Internal error: runEmbeddedPiAgent not available");
+  // Bundled install (built) — src/ tree doesn't exist, try dist/.
+  try {
+    // @ts-expect-error — dist/ doesn't exist at type-check time, only in packaged installs.
+    const mod = await import("../../../dist/agents/pi-embedded-runner.js");
+    if (typeof (mod as any).runEmbeddedPiAgent === "function") {
+      return (mod as any).runEmbeddedPiAgent;
+    }
+  } catch {
+    // ignore
   }
-  return mod.runEmbeddedPiAgent as RunEmbeddedPiAgentFn;
+
+  throw new Error("Internal error: runEmbeddedPiAgent not available (tried src/ and dist/)");
 }
 
 function stripCodeFences(s: string): string {
