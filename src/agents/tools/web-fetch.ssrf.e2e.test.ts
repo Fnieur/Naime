@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ssrf from "../../infra/net/ssrf.js";
-import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
+import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 
 const lookupMock = vi.fn();
 const resolvePinnedHostname = ssrf.resolvePinnedHostname;
@@ -28,10 +28,6 @@ function textResponse(body: string): Response {
     text: async () => body,
   } as unknown as Response;
 }
-
-type FetchMock = ReturnType<
-  typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>
->;
 
 function setMockFetch(
   impl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,

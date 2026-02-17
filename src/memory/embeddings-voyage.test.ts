@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../agents/model-auth.js";
-import { withFetchPreconnect } from "../test-utils/fetch-mock.js";
+import { type FetchMock, withFetchPreconnect } from "../test-utils/fetch-mock.js";
 import { createVoyageEmbeddingProvider, normalizeVoyageModel } from "./embeddings-voyage.js";
 
 vi.mock("../agents/model-auth.js", () => ({
@@ -12,10 +12,6 @@ vi.mock("../agents/model-auth.js", () => ({
     throw new Error(`No API key resolved for provider "${provider}" (auth mode: ${auth?.mode}).`);
   },
 }));
-
-type FetchMock = ReturnType<
-  typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>
->;
 
 const embeddingResponse = (embeddings: number[][]): Response =>
   new Response(

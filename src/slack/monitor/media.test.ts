@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ssrf from "../../infra/net/ssrf.js";
 import type { SavedMedia } from "../../media/store.js";
 import * as mediaStore from "../../media/store.js";
-import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
+import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 import {
   fetchWithSlackAuth,
   resolveSlackAttachmentContent,
@@ -12,9 +12,6 @@ import {
 
 // Store original fetch
 const originalFetch = globalThis.fetch;
-type FetchMock = ReturnType<
-  typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>
->;
 let mockFetch: FetchMock;
 const createSavedMedia = (filePath: string, contentType: string): SavedMedia => ({
   id: "saved-media-id",
