@@ -207,7 +207,7 @@ describe("spool watcher - handles concurrent events", () => {
 
         await watcher.start();
 
-        // Wait a bit for processing to start
+        // Wait for first event to start processing
         await new Promise((resolve) => setTimeout(resolve, 300 * CI_WAIT_MULTIPLIER));
 
         // Add another event while first is processing
@@ -217,8 +217,11 @@ describe("spool watcher - handles concurrent events", () => {
         });
         await writeSpoolEvent(event2);
 
-        // Wait for both to complete
-        await new Promise((resolve) => setTimeout(resolve, 800 * CI_WAIT_MULTIPLIER));
+        // Poll for both results instead of fixed timeout (chokidar polling can be slow in CI)
+        const deadline = Date.now() + 5000 * CI_WAIT_MULTIPLIER;
+        while (results.length < 2 && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
 
         await stopWatcherSafely(watcher);
 
