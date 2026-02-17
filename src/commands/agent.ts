@@ -155,7 +155,9 @@ function runAgentAttempt(params: {
     currentThreadTs: params.runContext.currentThreadTs,
     replyToMode: params.runContext.replyToMode,
     hasRepliedRef: params.runContext.hasRepliedRef,
-    senderIsOwner: true,
+    // Task 2.2: Mark CLI invocations as internal runtime calls (SYSTEM tier).
+    internal: true,
+    senderIsOwner: true, // Keep for now (legacy tool policy, removed in future)
     sessionFile: params.sessionFile,
     workspaceDir: params.workspaceDir,
     config: params.cfg,
