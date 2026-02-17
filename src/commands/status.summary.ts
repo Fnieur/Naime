@@ -1,11 +1,3 @@
-import type {
-  HeartbeatStatus,
-  SessionGroup,
-  SessionGroups,
-  SessionStatus,
-  SessionType,
-  StatusSummary,
-} from "./status.types.js";
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { resolveConfiguredModelRef } from "../agents/model-selection.js";
@@ -24,6 +16,14 @@ import { peekSystemEvents } from "../infra/system-events.js";
 import { parseAgentSessionKey } from "../routing/session-key.js";
 import { isCronJobSessionKey, isCronRunSessionKey } from "../sessions/session-key-utils.js";
 import { resolveLinkChannelContext } from "./status.link-channel.js";
+import type {
+  HeartbeatStatus,
+  SessionGroup,
+  SessionGroups,
+  SessionStatus,
+  SessionType,
+  StatusSummary,
+} from "./status.types.js";
 
 /**
  * Classify session type for grouping in status output.
@@ -130,7 +130,11 @@ export function groupSessions(sessions: SessionStatus[]): SessionGroups {
   // Collapse cron runs if there are many (show only count, not all sessions)
   const shouldCollapseRuns = cronRuns.length > 20;
 
-  const createGroup = (label: string, items: SessionStatus[], collapsed: boolean): SessionGroup => ({
+  const createGroup = (
+    label: string,
+    items: SessionStatus[],
+    collapsed: boolean,
+  ): SessionGroup => ({
     label,
     count: items.length,
     sessions: collapsed ? items.slice(0, 5) : items,

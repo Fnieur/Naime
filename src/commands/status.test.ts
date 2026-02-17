@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { SessionStatus } from "./status.types.js";
 import { classifySessionType, groupSessions } from "./status.summary.js";
+import type { SessionStatus } from "./status.types.js";
 
 // Helper to create mock sessions for testing
 const createMockSession = (
