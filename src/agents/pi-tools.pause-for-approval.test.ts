@@ -8,9 +8,8 @@ vi.mock("./tools/gateway.js", () => ({
   callGatewayTool: gatewayMocks.callGatewayTool,
 }));
 
-const { waitForResume, wrapToolWithPauseForApproval } = await import(
-  "./pi-tools.pause-for-approval.js"
-);
+const { waitForResume, wrapToolWithPauseForApproval } =
+  await import("./pi-tools.pause-for-approval.js");
 
 describe("pause-for-approval wrapper", () => {
   it("passes through non-paused results", async () => {

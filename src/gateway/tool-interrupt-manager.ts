@@ -165,7 +165,9 @@ function parseStoredRecord(value: unknown): StoredToolInterruptRecord | null {
     resumeTokenHash: record.resumeTokenHash.trim(),
     resumedAtMs: resumedAtMs ? Math.floor(resumedAtMs) : undefined,
     resumedBy:
-      typeof record.resumedBy === "string" || record.resumedBy === null ? record.resumedBy : undefined,
+      typeof record.resumedBy === "string" || record.resumedBy === null
+        ? record.resumedBy
+        : undefined,
     expiredAtMs: expiredAtMs ? Math.floor(expiredAtMs) : undefined,
   };
 }
@@ -204,7 +206,11 @@ export class ToolInterruptManager {
           if (this.shouldDropRecord(parsedRecord, now)) {
             continue;
           }
-          if (!parsedRecord.resumedAtMs && !parsedRecord.expiredAtMs && now >= parsedRecord.expiresAtMs) {
+          if (
+            !parsedRecord.resumedAtMs &&
+            !parsedRecord.expiredAtMs &&
+            now >= parsedRecord.expiresAtMs
+          ) {
             parsedRecord.expiredAtMs = now;
           }
           nextRecords.set(parsedRecord.approvalRequestId, parsedRecord);
@@ -226,7 +232,9 @@ export class ToolInterruptManager {
     this.clearPendingEntries();
   }
 
-  getSnapshot(approvalRequestId: string): Omit<StoredToolInterruptRecord, "resumeTokenHash"> | null {
+  getSnapshot(
+    approvalRequestId: string,
+  ): Omit<StoredToolInterruptRecord, "resumeTokenHash"> | null {
     const id = approvalRequestId.trim();
     if (!id) {
       return null;
@@ -249,7 +257,9 @@ export class ToolInterruptManager {
     };
   }
 
-  async emit(params: ToolInterruptBinding & { interrupt: Record<string, unknown>; timeoutMs?: number }) {
+  async emit(
+    params: ToolInterruptBinding & { interrupt: Record<string, unknown>; timeoutMs?: number },
+  ) {
     const id = params.approvalRequestId.trim();
     if (!id) {
       throw new Error("approvalRequestId is required");
@@ -331,10 +341,14 @@ export class ToolInterruptManager {
       throw new Error("failed to create tool interrupt");
     }
 
+    // Narrowing hint: TS sometimes fails to narrow pending/requested across the async lock.
+    const pendingEntry = pending as PendingInterruptEntry;
+    const requestedEntry = requested as ToolInterruptRequested;
+
     return {
       created,
-      requested,
-      wait: pending.promise,
+      requested: requestedEntry,
+      wait: pendingEntry.promise,
     } satisfies ToolInterruptEmitResult;
   }
 
@@ -352,8 +366,17 @@ export class ToolInterruptManager {
       toolCallId: params.toolCallId.trim(),
     };
     const resumeToken = params.resumeToken.trim();
-    if (!binding.approvalRequestId || !binding.runId || !binding.sessionKey || !binding.toolCallId) {
-      return { ok: false, code: "binding_mismatch", message: "run/session/tool binding is required" };
+    if (
+      !binding.approvalRequestId ||
+      !binding.runId ||
+      !binding.sessionKey ||
+      !binding.toolCallId
+    ) {
+      return {
+        ok: false,
+        code: "binding_mismatch",
+        message: "run/session/tool binding is required",
+      };
     }
     if (!resumeToken) {
       return { ok: false, code: "invalid_token", message: "resume token is required" };

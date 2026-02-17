@@ -25,4 +25,3 @@ export const ToolInterruptResumeParamsSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-

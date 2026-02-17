@@ -2,9 +2,9 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { GatewayRequestHandlerOptions } from "./types.js";
-import { createToolInterruptHandlers } from "./tool-interrupt.js";
 import { ToolInterruptManager } from "../tool-interrupt-manager.js";
+import { createToolInterruptHandlers } from "./tool-interrupt.js";
+import type { GatewayRequestHandlerOptions } from "./types.js";
 
 async function createTempInterruptPath() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-tool-interrupt-handler-"));
@@ -15,14 +15,18 @@ function baseHandlerArgs(
   overrides: Partial<GatewayRequestHandlerOptions>,
 ): GatewayRequestHandlerOptions {
   return {
-    req: { id: "req-1", type: "req", method: "tool.interrupt.emit" } as GatewayRequestHandlerOptions["req"],
+    req: {
+      id: "req-1",
+      type: "req",
+      method: "tool.interrupt.emit",
+    } as GatewayRequestHandlerOptions["req"],
     params: {},
     client: null,
     isWebchatConnect: () => false,
     respond: () => {},
     context: {
       broadcast: () => {},
-    } as GatewayRequestHandlerOptions["context"],
+    } as unknown as GatewayRequestHandlerOptions["context"],
     ...overrides,
   };
 }
@@ -113,4 +117,3 @@ describe("tool interrupt handlers", () => {
     manager.stop();
   });
 });
-

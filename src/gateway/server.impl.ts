@@ -62,8 +62,8 @@ import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
 import { GATEWAY_EVENTS, listGatewayMethods } from "./server-methods-list.js";
 import { coreGatewayHandlers } from "./server-methods.js";
 import { createExecApprovalHandlers } from "./server-methods/exec-approval.js";
-import { createToolInterruptHandlers } from "./server-methods/tool-interrupt.js";
 import { safeParseJson } from "./server-methods/nodes.helpers.js";
+import { createToolInterruptHandlers } from "./server-methods/tool-interrupt.js";
 import { hasConnectedMobileNode } from "./server-mobile-nodes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { createNodeSubscriptionManager } from "./server-node-subscriptions.js";
@@ -77,7 +77,6 @@ import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
-import { ToolInterruptManager } from "./tool-interrupt-manager.js";
 import {
   getHealthCache,
   getHealthVersion,
@@ -86,6 +85,7 @@ import {
   refreshGatewayHealthSnapshot,
 } from "./server/health-state.js";
 import { loadGatewayTlsRuntime } from "./server/tls.js";
+import { ToolInterruptManager } from "./tool-interrupt-manager.js";
 
 export { __resetModelCatalogCacheForTest } from "./server-model-catalog.js";
 

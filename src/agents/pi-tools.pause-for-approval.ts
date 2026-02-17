@@ -134,7 +134,7 @@ export async function waitForResume(params: {
   }>(
     "tool.interrupt.emit",
     {
-      ...(params.gateway ?? {}),
+      ...params.gateway,
       timeoutMs: rpcTimeoutMs,
     },
     {
@@ -196,4 +196,3 @@ export function wrapToolWithPauseForApproval(
 export const __testing = {
   extractPauseForApproval,
 };
-

@@ -126,4 +126,3 @@ describe("ToolInterruptManager", () => {
     reloaded.stop();
   });
 });
-
