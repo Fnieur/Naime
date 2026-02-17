@@ -1,3 +1,4 @@
+import type { PreparedSlackMessage } from "./types.js";
 import { resolveHumanDelayConfig } from "../../../agents/identity.js";
 import { dispatchInboundMessage } from "../../../auto-reply/dispatch.js";
 import { clearHistoryEntriesIfEnabled } from "../../../auto-reply/reply/history.js";
@@ -17,7 +18,6 @@ import {
 } from "../../stream-mode.js";
 import { resolveSlackThreadTargets } from "../../threading.js";
 import { createSlackReplyDeliveryPlan, deliverReplies } from "../replies.js";
-import type { PreparedSlackMessage } from "./types.js";
 
 export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessage) {
   const { ctx, account, message, route } = prepared;
@@ -272,6 +272,14 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
   markDispatchIdle();
 
   const anyReplyDelivered = queuedFinal || (counts.block ?? 0) > 0 || (counts.final ?? 0) > 0;
+
+  // Record thread participation after successful reply
+  if (anyReplyDelivered) {
+    const threadTs = prepared.ctxPayload.MessageThreadId ?? prepared.ctxPayload.ReplyToId;
+    if (threadTs) {
+      ctx.recordThreadParticipation(message.channel, String(threadTs));
+    }
+  }
 
   if (!anyReplyDelivered) {
     await draftStream.clear();
