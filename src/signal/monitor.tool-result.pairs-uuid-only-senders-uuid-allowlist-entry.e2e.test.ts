@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetInboundDedupe } from "../auto-reply/reply/inbound-dedupe.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { resetSystemEventsForTest } from "../infra/system-events.js";
 import { monitorSignalProvider } from "./monitor.js";
 
 const sendMock = vi.fn();
 const replyMock = vi.fn();
 const updateLastRouteMock = vi.fn();
-let config: Record<string, unknown> = {};
+let config: OpenClawConfig = {};
 const readAllowFromStoreMock = vi.fn();
 const upsertPairingRequestMock = vi.fn();
 
@@ -57,7 +58,7 @@ vi.mock("./accounts.js", () => ({
     baseUrl: "http://localhost:8080",
     configured: true,
     name: "default",
-    config: { apiMode: "native" },
+    config: {},
   }),
 }));
 

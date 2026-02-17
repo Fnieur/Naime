@@ -159,7 +159,7 @@ async function waitForSignalDaemonReady(params: {
     abortSignal: params.abortSignal,
     runtime: params.runtime,
     check: async () => {
-      const res = await checkAdapter(params.baseUrl, undefined, 1000);
+      const res = await checkAdapter(params.baseUrl, 1000);
       if (res.ok) {
         return { ok: true };
       }

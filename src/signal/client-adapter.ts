@@ -6,8 +6,6 @@
  * never need to know or pass apiMode.
  */
 
-import type { SignalApiMode } from "../config/types.signal.js";
-import type { SignalRpcOptions } from "./client.js";
 import { loadConfig } from "../config/config.js";
 import {
   containerCheck,
@@ -19,9 +17,11 @@ import {
   containerSendTyping,
   streamContainerEvents,
 } from "./client-container.js";
+import type { SignalRpcOptions } from "./client.js";
 import { signalCheck, signalRpcRequest, streamSignalEvents } from "./client.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+const MODE_CACHE_TTL_MS = 30_000;
 
 export type SignalAdapterEvent = {
   event?: string;
@@ -29,7 +29,7 @@ export type SignalAdapterEvent = {
 };
 
 // Cache auto-detected modes per baseUrl to avoid repeated network probes.
-const detectedModeCache = new Map<string, "native" | "container">();
+const detectedModeCache = new Map<string, { mode: "native" | "container"; expiresAt: number }>();
 
 /**
  * Resolve the effective API mode for a given baseUrl + accountId.
@@ -49,11 +49,11 @@ async function resolveApiMode(
 
   // "auto" — check cache first, then probe
   const cached = detectedModeCache.get(baseUrl);
-  if (cached) {
-    return cached;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.mode;
   }
   const detected = await detectSignalApiMode(baseUrl);
-  detectedModeCache.set(baseUrl, detected);
+  detectedModeCache.set(baseUrl, { mode: detected, expiresAt: Date.now() + MODE_CACHE_TTL_MS });
   return detected;
 }
 
@@ -162,6 +162,7 @@ async function handleContainerRpc<T>(
     case "sendReaction": {
       const recipient = (params.recipients as string[] | undefined)?.[0] ?? "";
       const groupId = (params.groupIds as string[] | undefined)?.[0] ?? undefined;
+      const formattedGroupId = groupId ? formatGroupIdForContainer(groupId) : undefined;
       const reactionParams = {
         baseUrl: opts.baseUrl,
         account: (params.account as string) ?? "",
@@ -169,7 +170,7 @@ async function handleContainerRpc<T>(
         emoji: (params.emoji as string) ?? "",
         targetAuthor: (params.targetAuthor as string) ?? recipient,
         targetTimestamp: params.targetTimestamp as number,
-        groupId,
+        groupId: formattedGroupId,
         timeoutMs: opts.timeoutMs,
       };
       const fn = params.remove ? containerRemoveReaction : containerSendReaction;
@@ -453,16 +454,13 @@ export async function removeReactionAdapter(params: {
 
 /**
  * Check Signal API availability.
- * Accepts optional apiMode for diagnostic tools (e.g. probe);
- * if omitted, resolves from config.
+ * Mode resolution is internal to adapter.
  */
 export async function checkAdapter(
   baseUrl: string,
-  apiMode?: SignalApiMode,
   timeoutMs = DEFAULT_TIMEOUT_MS,
-  accountId?: string,
 ): Promise<{ ok: boolean; status?: number | null; error?: string | null }> {
-  const mode = apiMode && apiMode !== "auto" ? apiMode : await resolveApiMode(baseUrl, accountId);
+  const mode = await resolveApiMode(baseUrl);
   if (mode === "container") {
     return containerCheck(baseUrl, timeoutMs);
   }

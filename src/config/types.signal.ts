@@ -26,13 +26,6 @@ export type SignalAccountConfig = {
   account?: string;
   /** Optional full base URL for signal-cli HTTP daemon. */
   httpUrl?: string;
-  /**
-   * Signal API mode:
-   * - "auto" (default): Auto-detect based on available endpoints
-   * - "native": Use native signal-cli with JSON-RPC + SSE (/api/v1/rpc, /api/v1/events)
-   * - "container": Use bbernhard/signal-cli-rest-api with REST + WebSocket (/v2/send, /v1/receive/{account})
-   */
-  apiMode?: SignalApiMode;
   /** HTTP host for signal-cli daemon (default 127.0.0.1). */
   httpHost?: string;
   /** HTTP port for signal-cli daemon (default 8080). */
@@ -97,6 +90,13 @@ export type SignalAccountConfig = {
 };
 
 export type SignalConfig = {
+  /**
+   * Signal API mode (channel-global):
+   * - "auto" (default): Auto-detect based on available endpoints
+   * - "native": Use native signal-cli with JSON-RPC + SSE (/api/v1/rpc, /api/v1/events)
+   * - "container": Use bbernhard/signal-cli-rest-api with REST + WebSocket (/v2/send, /v1/receive/{account})
+   */
+  apiMode?: SignalApiMode;
   /** Optional per-account Signal configuration (multi-account). */
   accounts?: Record<string, SignalAccountConfig>;
 } & SignalAccountConfig;

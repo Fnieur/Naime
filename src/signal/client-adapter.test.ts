@@ -24,6 +24,8 @@ vi.mock("./client-container.js", () => ({
   containerSendMessage: vi.fn(),
   containerSendTyping: vi.fn(),
   containerSendReceipt: vi.fn(),
+  containerSendReaction: vi.fn(),
+  containerRemoveReaction: vi.fn(),
   containerFetchAttachment: vi.fn(),
   streamContainerEvents: vi.fn(),
 }));
@@ -37,6 +39,8 @@ import {
   containerSendMessage,
   containerSendTyping,
   containerSendReceipt,
+  containerSendReaction,
+  containerRemoveReaction,
   containerFetchAttachment,
   streamContainerEvents,
 } from "./client-container.js";
@@ -49,6 +53,8 @@ const mockContainerCheck = vi.mocked(containerCheck);
 const mockContainerSendMessage = vi.mocked(containerSendMessage);
 const mockContainerSendTyping = vi.mocked(containerSendTyping);
 const mockContainerSendReceipt = vi.mocked(containerSendReceipt);
+const mockContainerSendReaction = vi.mocked(containerSendReaction);
+const mockContainerRemoveReaction = vi.mocked(containerRemoveReaction);
 const mockContainerFetchAttachment = vi.mocked(containerFetchAttachment);
 const mockStreamContainerEvents = vi.mocked(streamContainerEvents);
 const mockLoadConfig = vi.mocked(loadConfig);
@@ -349,6 +355,37 @@ describe("sendReceiptAdapter", () => {
   });
 });
 
+describe("adapterRpcRequest (container reaction formatting)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setApiMode("container");
+  });
+
+  it("formats groupIds before calling container reactions", async () => {
+    mockContainerSendReaction.mockResolvedValue({ timestamp: 1 });
+
+    await adapterRpcRequest(
+      "sendReaction",
+      {
+        account: "+14259798283",
+        recipients: ["+15550001111"],
+        emoji: "✅",
+        targetAuthor: "uuid:123e4567-e89b-12d3-a456-426614174000",
+        targetTimestamp: 123,
+        groupIds: ["group-123"],
+      },
+      { baseUrl: "http://localhost:8080" },
+    );
+
+    expect(mockContainerSendReaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groupId: "group.Z3JvdXAtMTIz",
+      }),
+    );
+    expect(mockContainerRemoveReaction).not.toHaveBeenCalled();
+  });
+});
+
 describe("fetchAttachmentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -441,9 +478,10 @@ describe("checkAdapter", () => {
   });
 
   it("uses native check for native mode", async () => {
+    setApiMode("native");
     mockSignalCheck.mockResolvedValue({ ok: true, status: 200 });
 
-    const result = await checkAdapter("http://localhost:8080", "native");
+    const result = await checkAdapter("http://localhost:8080");
 
     expect(result).toEqual({ ok: true, status: 200 });
     expect(mockSignalCheck).toHaveBeenCalledWith("http://localhost:8080", 10000);
@@ -451,9 +489,10 @@ describe("checkAdapter", () => {
   });
 
   it("uses container check for container mode", async () => {
+    setApiMode("container");
     mockContainerCheck.mockResolvedValue({ ok: true, status: 200 });
 
-    const result = await checkAdapter("http://localhost:8080", "container");
+    const result = await checkAdapter("http://localhost:8080");
 
     expect(result).toEqual({ ok: true, status: 200 });
     expect(mockContainerCheck).toHaveBeenCalledWith("http://localhost:8080", 10000);
@@ -461,9 +500,10 @@ describe("checkAdapter", () => {
   });
 
   it("respects timeout parameter", async () => {
+    setApiMode("native");
     mockSignalCheck.mockResolvedValue({ ok: true });
 
-    await checkAdapter("http://localhost:8080", "native", 5000);
+    await checkAdapter("http://localhost:8080", 5000);
 
     expect(mockSignalCheck).toHaveBeenCalledWith("http://localhost:8080", 5000);
   });

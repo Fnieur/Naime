@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
 import { resetInboundDedupe } from "../auto-reply/reply/inbound-dedupe.js";
+import type { OpenClawConfig } from "../config/config.js";
 import { peekSystemEvents, resetSystemEventsForTest } from "../infra/system-events.js";
 import { resolveAgentRoute } from "../routing/resolve-route.js";
 import { normalizeE164 } from "../utils.js";
@@ -10,7 +10,7 @@ const waitForTransportReadyMock = vi.hoisted(() => vi.fn());
 const sendMock = vi.fn();
 const replyMock = vi.fn();
 const updateLastRouteMock = vi.fn();
-let config: Record<string, unknown> = {};
+let config: OpenClawConfig = {};
 const readAllowFromStoreMock = vi.fn();
 const upsertPairingRequestMock = vi.fn();
 
@@ -425,7 +425,7 @@ describe("monitorSignalProvider tool results", () => {
     await flush();
 
     const route = resolveAgentRoute({
-      cfg: config as OpenClawConfig,
+      cfg: config,
       channel: "signal",
       accountId: "default",
       peer: { kind: "direct", id: normalizeE164("+15550001111") },
@@ -481,7 +481,7 @@ describe("monitorSignalProvider tool results", () => {
     await flush();
 
     const route = resolveAgentRoute({
-      cfg: config as OpenClawConfig,
+      cfg: config,
       channel: "signal",
       accountId: "default",
       peer: { kind: "direct", id: normalizeE164("+15550001111") },
