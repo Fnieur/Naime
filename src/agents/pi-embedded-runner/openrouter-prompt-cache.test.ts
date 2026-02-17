@@ -46,7 +46,9 @@ describe("OpenRouter Prompt Cache", () => {
     return new Promise<void>((resolve) => {
       // Use a long system prompt to ensure it gets cached
       const longSystemPrompt =
-        "You are a helpful assistant. " + "a".repeat(2000) + " Always be helpful and provide clear explanations.";
+        "You are a helpful assistant. " +
+        "a".repeat(2000) +
+        " Always be helpful and provide clear explanations.";
 
       const mockStreamFn = ((_model: any, _context: any, options: any) => {
         const payload = {
@@ -57,7 +59,11 @@ describe("OpenRouter Prompt Cache", () => {
         return createMockStream();
       }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
+      const wrapper = createOpenRouterPromptCacheWrapper(
+        mockStreamFn,
+        "openrouter",
+        "google/gemini-3-flash-preview",
+      );
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
@@ -94,7 +100,11 @@ describe("OpenRouter Prompt Cache", () => {
         return createMockStream();
       }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
+      const wrapper = createOpenRouterPromptCacheWrapper(
+        mockStreamFn,
+        "openrouter",
+        "google/gemini-3-flash-preview",
+      );
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
@@ -137,7 +147,11 @@ describe("OpenRouter Prompt Cache", () => {
         return createMockStream();
       }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
+      const wrapper = createOpenRouterPromptCacheWrapper(
+        mockStreamFn,
+        "openrouter",
+        "google/gemini-3-flash-preview",
+      );
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
@@ -180,7 +194,11 @@ describe("OpenRouter Prompt Cache", () => {
         return createMockStream();
       }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
+      const wrapper = createOpenRouterPromptCacheWrapper(
+        mockStreamFn,
+        "openrouter",
+        "google/gemini-3-flash-preview",
+      );
 
       if (!wrapper) {
         throw new Error("Wrapper not created");

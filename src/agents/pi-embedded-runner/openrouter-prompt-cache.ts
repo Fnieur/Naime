@@ -172,11 +172,7 @@ function processSystemForCaching(
 
   if (typeof system === "string") {
     // System messages are stable, cache entirely as a single block
-    if (system.length < 1024) {
-      // Very short, just return as single cached block
-      return [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
-    }
-    // Longer system prompts: create single cached block (don't split like user messages)
+    // No length check needed as both branches used identical logic
     return [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
   }
 
