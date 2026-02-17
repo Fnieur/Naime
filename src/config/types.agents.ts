@@ -67,6 +67,8 @@ export type AgentConfig = {
   /** Per-agent context pruning overrides (mode: off | cache-ttl). */
   contextPruning?: {
     mode?: "off" | "cache-ttl";
+    ttl?: string;
+    keepLastAssistants?: number;
   };
   tools?: AgentToolsConfig;
 };

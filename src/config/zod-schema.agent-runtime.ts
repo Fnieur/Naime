@@ -634,6 +634,8 @@ export const AgentEntrySchema = z
     contextPruning: z
       .object({
         mode: z.union([z.literal("off"), z.literal("cache-ttl")]).optional(),
+        ttl: z.string().optional(),
+        keepLastAssistants: z.number().optional(),
       })
       .strict()
       .optional(),

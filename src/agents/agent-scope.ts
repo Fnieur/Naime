@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
-import type { AgentCompactionConfig } from "../config/types.agent-defaults.js";
+import type { AgentCompactionConfig, AgentContextPruningConfig } from "../config/types.agent-defaults.js";
 import { resolveStateDir } from "../config/paths.js";
 import {
   DEFAULT_AGENT_ID,
@@ -183,7 +183,7 @@ export function resolveAgentContextPruningMode(
 export function resolveAgentContextPruning(
   cfg: OpenClawConfig,
   agentId?: string,
-): { mode?: "off" | "cache-ttl"; ttl?: string; keepLastAssistants?: number } | undefined {
+): AgentContextPruningConfig | undefined {
   const perAgent = agentId ? resolveAgentConfig(cfg, agentId)?.contextPruning : undefined;
   const defaults = cfg?.agents?.defaults?.contextPruning;
   if (!perAgent && !defaults) return undefined;

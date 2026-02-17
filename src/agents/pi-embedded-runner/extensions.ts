@@ -51,15 +51,11 @@ function buildContextPruningExtension(params: {
   if (resolved?.mode !== "cache-ttl") {
     return {};
   }
-  const raw = resolved;
-  if (!raw) {
-    return {};
-  }
   if (!isCacheTtlEligibleProvider(params.provider, params.modelId)) {
     return {};
   }
 
-  const settings = computeEffectiveSettings(raw);
+  const settings = computeEffectiveSettings(resolved);
   if (!settings) {
     return {};
   }
