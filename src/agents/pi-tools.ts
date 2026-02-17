@@ -45,6 +45,7 @@ import {
 import { cleanToolSchemaForGemini, normalizeToolParameters } from "./pi-tools.schema.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 import type { SandboxContext } from "./sandbox.js";
+import { parseSandboxBindMount } from "./sandbox/fs-paths.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
 import {
   applyToolPolicyPipeline,
@@ -282,6 +283,12 @@ export function createOpenClawCodingTools(options?: {
   const allowWorkspaceWrites = sandbox?.workspaceAccess !== "ro";
   const workspaceRoot = resolveWorkspaceRoot(options?.workspaceDir);
   const workspaceOnly = fsConfig.workspaceOnly === true;
+  // Extract host roots from Docker bind mounts so the workspace-only guard
+  // can allow paths within explicitly configured bind mounts (#16379).
+  const bindMountHostRoots = (sandbox?.docker?.binds ?? [])
+    .map((spec) => parseSandboxBindMount(spec))
+    .filter((m): m is NonNullable<typeof m> => m !== null)
+    .map((m) => m.hostRoot);
   const applyPatchConfig = execConfig.applyPatch;
   // Secure by default: apply_patch is workspace-contained unless explicitly disabled.
   // (tools.fs.workspaceOnly is a separate umbrella flag for read/write/edit/apply_patch.)
@@ -306,11 +313,23 @@ export function createOpenClawCodingTools(options?: {
           root: sandboxRoot,
           bridge: sandboxFsBridge!,
         });
-        return [workspaceOnly ? wrapToolWorkspaceRootGuard(sandboxed, sandboxRoot) : sandboxed];
+        return [
+          workspaceOnly
+            ? wrapToolWorkspaceRootGuard(sandboxed, sandboxRoot, {
+                additionalRoots: bindMountHostRoots,
+              })
+            : sandboxed,
+        ];
       }
       const freshReadTool = createReadTool(workspaceRoot);
       const wrapped = createOpenClawReadTool(freshReadTool);
-      return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot) : wrapped];
+      return [
+        workspaceOnly
+          ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot, {
+              additionalRoots: bindMountHostRoots,
+            })
+          : wrapped,
+      ];
     }
     if (tool.name === "bash" || tool.name === execToolName) {
       return [];
@@ -324,7 +343,13 @@ export function createOpenClawCodingTools(options?: {
         createWriteTool(workspaceRoot),
         CLAUDE_PARAM_GROUPS.write,
       );
-      return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot) : wrapped];
+      return [
+        workspaceOnly
+          ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot, {
+              additionalRoots: bindMountHostRoots,
+            })
+          : wrapped,
+      ];
     }
     if (tool.name === "edit") {
       if (sandboxRoot) {
@@ -335,7 +360,13 @@ export function createOpenClawCodingTools(options?: {
         createEditTool(workspaceRoot),
         CLAUDE_PARAM_GROUPS.edit,
       );
-      return [workspaceOnly ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot) : wrapped];
+      return [
+        workspaceOnly
+          ? wrapToolWorkspaceRootGuard(wrapped, workspaceRoot, {
+              additionalRoots: bindMountHostRoots,
+            })
+          : wrapped,
+      ];
     }
     return [tool];
   });
@@ -394,12 +425,14 @@ export function createOpenClawCodingTools(options?: {
               ? wrapToolWorkspaceRootGuard(
                   createSandboxedEditTool({ root: sandboxRoot, bridge: sandboxFsBridge! }),
                   sandboxRoot,
+                  { additionalRoots: bindMountHostRoots },
                 )
               : createSandboxedEditTool({ root: sandboxRoot, bridge: sandboxFsBridge! }),
             workspaceOnly
               ? wrapToolWorkspaceRootGuard(
                   createSandboxedWriteTool({ root: sandboxRoot, bridge: sandboxFsBridge! }),
                   sandboxRoot,
+                  { additionalRoots: bindMountHostRoots },
                 )
               : createSandboxedWriteTool({ root: sandboxRoot, bridge: sandboxFsBridge! }),
           ]
