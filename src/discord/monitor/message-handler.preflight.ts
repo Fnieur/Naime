@@ -207,7 +207,7 @@ export async function preflightDiscordMessage(
 
   // Intercept text-only slash commands (e.g. user typing "/reset" instead of using Discord's slash command picker)
   // These should not be forwarded to the agent; proper slash command interactions are handled elsewhere
-  if (baseText && hasControlCommand(baseText, params.cfg)) {
+  if (!isDirectMessage && baseText && hasControlCommand(baseText, params.cfg)) {
     logVerbose(`discord: drop text-based slash command ${message.id} (intercepted at gateway)`);
     return null;
   }
