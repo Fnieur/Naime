@@ -52,6 +52,11 @@ Channel implementations (`telegram/`, `discord/`, `slack/`, `signal/`, `line/`, 
 | `auto-reply/templating.ts` | `MsgContext`, `TemplateContext` types                              |
 | `auto-reply/thinking.ts`   | `ThinkLevel`, `VerboseLevel`, `normalizeVerboseLevel()`            |
 | `logging/subsystem.ts`     | `createSubsystemLogger()`                                          |
+| `agents/subagent-depth.ts` | Nested subagent depth tracking and orchestration controls           |
+| `agents/subagent-announce-queue.ts` | Subagent result announcement queueing                       |
+| `discord/components.ts`    | Discord Component v2 UI rendering and registry                     |
+| `infra/install-safe-path.ts` | Restricted skill download target path validation                 |
+| `pairing/pairing-store.ts` | Account-scoped device pairing store                                |
 
 ---
 
@@ -189,10 +194,10 @@ gateway/server-plugins.ts
 ### Running Tests
 
 ```bash
-# Full suite
-pnpm vitest run
+# Full suite (parallel runner, matches CI)
+pnpm test
 
-# Single module
+# Single module (direct vitest for targeted runs)
 pnpm vitest run src/config/
 
 # Single file
@@ -271,19 +276,6 @@ pnpm vitest run --coverage
 6. **Normalize paths before string comparison** — `path.resolve()` before `===`.
 7. **Derive context from parameters, not global state** — use explicit paths, not env var fallbacks.
 8. **Run FULL `pnpm lint` before every push** — not just changed files. Type-aware linting catches cross-file issues.
-9. **Verify Node built-in imports** — `crypto`, `fs`, `path`, etc. must be imported before use. Easy to miss with `crypto.randomUUID()`.
-10. **Fallback paths must not undo the fix** — if your fix adds a safe path (e.g., temp-file + rename), the fallback/catch must NOT revert to the unsafe pattern you're fixing (e.g., direct `writeFile`).
-11. **Guard window semantics** — when adding time-based guards (e.g., spin-loop prevention), clarify whether you measure from `startedAt`, `endedAt`, or `updatedAt`. Long-running operations can exceed the guard window if anchored to start time.
-12. **`String.replace()` is not global** — `str.replace('x', 'y')` replaces only the first occurrence. Use `replaceAll()` or `/x/g`.
-13. **`new URL()` strips IPv6 brackets** — `new URL('http://[::1]').hostname` → `'::1'`. Re-add brackets when reconstructing URLs.
-14. **`split(':')` drops colons in values** — `'user:pass:word'.split(':')` → 3 parts. Use `indexOf`+`slice` to keep the value intact.
-15. **Enum vs translated string comparison** — `value === t('Active')` breaks in non-English locales. Always compare against the raw enum constant.
-16. **`if (obj)` is truthy for `{}`** — An initialized-but-empty object passes truthiness checks. Test for the specific key: `if (obj.id)`.
-17. **Glob patterns in hot loops** — `new Minimatch(pattern)` inside a loop recompiles every call. Cache the compiled matcher.
-18. **Four passes → one** — Chaining `.filter().map().reduce().forEach()` allocates intermediate arrays. Combine into a single `.reduce()`.
-19. **`@playwright/test` ≠ `playwright`** — Test runner package vs library package have different exports.
-20. **`setInterval` without `.unref()` prevents shutdown** — Background housekeeping timers keep the event loop alive.
-21. **Tests must exercise the actual code, not a copy** — Duplicating implementation in tests proves nothing. Import and call the real function.
 
 ---
 
@@ -318,6 +310,8 @@ pnpm vitest run --coverage
 | `browser`           | `types.browser.ts`                 | `zod-schema.ts`                    |
 
 All type files are in `src/config/`, all Zod schemas in `src/config/`.
+
+> **v2026.2.15 additions:** `messages.suppressToolErrors` (bool) suppresses tool error display. Per-channel `ackReaction` config added to Telegram, Discord, Slack, WhatsApp type files.
 
 ### How to Add a New Config Key
 
@@ -423,16 +417,16 @@ src/<module>/
 - **Session file writes**: `agents/session-write-lock.ts` provides file-based locking. Concurrent JSONL appends without locking corrupt files.
 - **Gateway config reload**: `gateway/config-reload.ts` uses chokidar debounce. Rapid config changes can trigger multiple reloads.
 - **Telegram media groups**: `bot-updates.ts` aggregates photos with a timeout window. Changing this can split or merge groups incorrectly.
-- **Atomic file writes need atomic fallbacks**: temp-file + rename is safe, but falling back to direct `writeFile` on rename failure reintroduces truncation races. Fallback should retry rename or fail, never bypass the atomic pattern.
-- **SQLite WAL stale readers**: cached `db` connections in WAL mode hold a snapshot. After external writes (e.g., subprocess updates), close and reopen to see new data. Set `db = null` for lazy reopen.
-- **Reconnect guard + `await`**: A boolean `isReconnecting` checked before an `await` can be disarmed by another event during the await. Use a mutex or hold the guard across the full async span. (PR #17588)
-- **Close handler nulls a replaced reference**: `onClosed` sets `socket = null`, but a new connection may have already replaced it. Compare identity before nulling. (PR #17588)
-- **Shared temp file path**: Two concurrent requests writing to `/tmp/hardcoded-name` clobber each other. Use `mktemp` or embed request IDs. (PR #17714)
-- **Duplicate timeout mechanisms**: Spawn's built-in timeout + a manual `setTimeout` race to kill the process. Pick one mechanism. (PR #17714)
-- **Cached rejected promise**: `const ready = init()` — if `init()` rejects once, `ready` is forever-rejected. Use a lazy-init pattern that retries. (PR #17428)
-- **Missing response callback in error path**: Async handler throws → response callback never called → caller hangs indefinitely. Always respond in `finally`. (PR #17343)
-- **Unguarded perpetual runner**: A single unhandled throw in an idle-trigger loop kills it permanently. Wrap loop body in try/catch. (PR #17321)
-- **FTS extension file copy race**: Multiple processes copying the same SQLite extension file simultaneously can produce a corrupted binary. Use a lock or atomic rename. (PR #17628)
+- **Telegram draft stream cleanup vs fallback delivery**: `bot-message-dispatch.ts` has a `finally` block that calls `draftStream?.stop()`. The actual preview cleanup (`clear()`) must run **after** fallback delivery logic, but must still be guaranteed via `try/finally` wrapping the fallback. Cleanup in a `finally` that runs *before* fallback logic executes too early — the preview gets deleted before fallback can send, causing silent message loss (#19001). Always use this pattern:
+  ```ts
+  try {
+    await fallbackDelivery();
+  } finally {
+    clearDraftPreviewIfNeeded();  // runs even if fallback throws
+  }
+  ```
+  If the fallback itself throws and cleanup isn't in `finally`, stale preview messages are left behind.
+- **Telegram `disableBlockStreaming` evaluation order**: When `streamMode === "off"`, `disableBlockStreaming` must be `true` (not `undefined`). A ternary chain like `a ? x : b ? y : undefined` produces `undefined` instead of `true` when the priority condition isn't checked first. Code using `if (disableBlockStreaming)` treats `undefined` as falsy, silently allowing block streaming in off mode with `draftStream === undefined` → message loss. Always put the most restrictive condition first, and prefer explicit `true`/`false` over `undefined` in boolean ternaries.
 
 ### Other Landmines
 
@@ -441,40 +435,40 @@ src/<module>/
 - **Discord 2000 char limit**: `discord/chunk.ts` enforces limits with fence-aware splitting. Don't bypass the chunker.
 - **Signal styled text**: Uses byte-position ranges, not character positions. Multi-byte chars shift ranges.
 - **WhatsApp target normalization**: Converts between E.164, JID (`@s.whatsapp.net`), and display formats. Getting this wrong means messages go nowhere silently.
-- **Telegram channel posts skip the main message pipeline**: Debounce, dedup (`shouldSkipUpdate`), media resolution, and access control need separate handling for `channel_post`. (PR #17857)
-- **ZWNJ (U+200C) in terminal output corrupts URLs**: Invisible but breaks copy-paste. Strip ZWNJ from any string rendered as a link. (PR #17777)
-- **SwiftPM resolves the max deployment target across all deps**: One dependency requiring macOS 15 pulls the entire graph to macOS 15. (PR #17720)
-- **Legacy config migration runs unconditionally**: Re-applies defaults on every startup, overwriting user removals. Gate behind schema-version. (PR #17637)
-- **Comments that contradict code are worse than no comments**: "PUT /api/x" above a POST call actively misleads. Delete stale comments during review. (PR #17558)
-- **Duplicate type definitions drift**: Two `interface Foo` in different files diverge silently. Single source of truth, re-export everywhere. (PR #17690)
-- **Telegram @-username is ambiguous**: `@foo` can be a user, bot, or public supergroup. Always check resolved entity type. (PR #17433)
+- **`config.patch` path nesting matters**: `config.patch` with `{"telegram":{"streamMode":"off"}}` silently writes to an ignored top-level key. The correct path is `{"channels":{"telegram":{"streamMode":"off"}}}`. A "successful" patch that changes nothing is worse than an error — always verify the full nested structure before patching.
+- **Gateway config patches need read-back verification**: After `config.patch`, always read back the config to confirm the change took effect. Silent success + wrong nesting path = hours of debugging the wrong code while the config was never actually changed.
+
+### v2026.2.15 New Gotchas
+
+9. **Pairing stores are now account-scoped** — `pairing/pairing-store.ts` scopes by account. Old unscoped pairing data requires migration via `legacy allowFrom migration` in Telegram.
+
+10. **Nested subagent depth limits** — `agents/subagent-depth.ts` enforces max depth (default 2) and max children per agent (default 5). Exceeding these silently blocks spawning.
+
+11. **Discord Component v2 UI** — `discord/components.ts` and `discord/components-registry.ts` handle new Discord components. The `send.components.ts` file handles outbound component messages separately from regular sends.
+
+12. **Memory collections are now per-agent isolated** — Managed QMD collections are isolated per agent. Drifted collection paths are automatically rebound. Don't assume shared memory across agents.
+
+13. **Cron skill-filter snapshots are normalized** — Cron service normalizes skill-filter snapshots. Treat missing `enabled` as `true` in cron job updates. Model-only update patches infer payload kind automatically.
+
+14. **`sessions_spawn` supports model fallback** — The `model` parameter in `sessions_spawn` now supports fallback chains. Don't assume the spawned session uses exactly the requested model.
+
+15. **Skill download paths are restricted** — `infra/install-safe-path.ts` validates target paths for skill downloads, preventing path traversal. Cross-platform fallback for non-brew installs added.
 
 ---
 
-## 10. Security Checklist
+## 10. PR & Bug Filing Best Practices
 
-> Apply to every PR that touches networking, user input, shell execution, or secrets.
+### Multi-Model Review
 
-| Check                | Description                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **SSRF**             | Validate the **resolved IP**, not just hostname. Use `fetchWithSsrFGuard()`. (PR #17762)                                       |
-| **Error exposure**   | Never send stack traces or internal paths to user-supplied callback URLs. (PR #17762)                                          |
-| **External content** | All untrusted content must be wrapped with `externalContent` metadata. (PR #17703)                                             |
-| **Path traversal**   | `path.basename()` user-supplied names; reject path separators. A skill name like `../../etc` = arbitrary deletion. (PR #17503) |
-| **Shell injection**  | Never interpolate user strings into shell commands. Use `execFile` with arg arrays. (PR #17667)                                |
-| **Prompt injection** | PR titles, file paths, user text in LLM prompts can hijack the model. Escape or sandbox. (PR #17349)                           |
-| **curl \| sh**       | Don't. Use checksummed package downloads. (PR #17661)                                                                          |
-| **Honest UA**        | Automated HTTP requests must not impersonate real browsers. (PR #17768)                                                        |
-| **Key cleanup**      | Zero secret buffers in `finally` blocks, not just success paths. (PR #17454)                                                   |
-| **Exec approvals**   | Any new shell/exec code path must go through the exec-approval system. (PR #17667)                                             |
+- Use multiple models for PR review when complexity warrants it. Different models catch different classes of bugs: one focuses on correctness (happy path), another on failure paths (what happens when recovery itself fails). At minimum, use one model for "does it work?" and another for "what breaks?"
 
----
+### Test Matrices
 
-## 11. Packaging & Dependencies
+- **Test across ALL config permutations.** Telegram has 3 `streamMode` values (`partial` / `block` / `off`), each with different code paths. A fix for one mode can break another. Build a test matrix covering every mode × every failure scenario before claiming a fix is complete.
+- File bugs with full test matrices. Include: reproduction steps for each mode, all root causes identified, and a gap matrix showing which PRs fix which scenarios. Detailed issues attract better reviews and prevent partial fixes (e.g., #19001).
 
-- **`openclaw` in `devDependencies`, never `dependencies`** — shipping the CLI to end users bloats installs. (PR #17714)
-- **Declare every `import` in `package.json`** — don't rely on workspace hoisting. `zod`, `playwright`, etc. must appear in your package's own `dependencies`. (PR #17714)
-- **Run `depcheck` periodically** — unused deps slow installs and widen attack surface. (PR #17566)
-- **Align sub-package versions with root `package.json`** — mismatches cause resolution surprises. (PR #17551)
-- **Use the correct package variant** — `@playwright/test` (test framework) ≠ `playwright` (automation library). (PR #17392)
-- **Check for merge-conflict backup files** — `*.orig`, `*.bak` should never be committed. Add to `.gitignore`. (PR #17387)
+### Issue & PR Workflow
+
+- **Search existing issues before filing.** A quick `gh issue list --search "<keywords>"` surfaces prior analysis and avoids duplicate effort. Issue #18244 (Telegram message loss) was found only after deep investigation — a search would have saved hours.
+- **One PR, multiple root causes = scope risk.** A PR fixing 3 distinct failure modes (eval order, failed delivery tracking, cleanup timing) is harder to review even if each fix is independently correct. Consider whether splitting gets faster review vs. the coherence benefit of a single fix.
+- **Scope PRs to one logical change when possible.** If root causes are independent, separate PRs are easier to review, revert, and bisect.
