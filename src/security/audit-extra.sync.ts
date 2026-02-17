@@ -3,6 +3,7 @@
  *
  * These functions analyze config-based security properties without I/O.
  */
+import { posix } from "node:path";
 import type { SandboxToolPolicy } from "../agents/sandbox/types.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { AgentToolsConfig } from "../config/types.tools.js";
@@ -635,7 +636,8 @@ export function collectSandboxDockerNoopFindings(cfg: OpenClawConfig): SecurityA
 
 function isDangerousBind(bind: string): string | null {
   const hostPath = bind.split(":")[0] ?? bind;
-  const normalized = hostPath.replace(/\/+$/, "") || "/";
+  // Use posix.normalize to handle .., ., and // like runtime validation does
+  const normalized = posix.normalize(hostPath).replace(/\/+$/, "") || "/";
   for (const blocked of BLOCKED_HOST_PATHS) {
     if (normalized === blocked || normalized.startsWith(blocked + "/")) {
       return blocked;
