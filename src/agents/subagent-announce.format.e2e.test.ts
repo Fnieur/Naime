@@ -165,6 +165,36 @@ describe("subagent announce formatting", () => {
     expect(msg).toContain("Keep this internal context private");
   });
 
+  it("adds adaptive system-style guidance for delivery fallback announcements", async () => {
+    const { runSubagentAnnounceFlow } = await import("./subagent-announce.js");
+    await runSubagentAnnounceFlow({
+      childSessionKey: "agent:main:subagent:test",
+      childRunId: "run-delivery-fallback",
+      requesterSessionKey: "agent:main:main",
+      requesterDisplayKey: "main",
+      deliveryFallback: {
+        channel: "telegram",
+        to: "123",
+        error: "send failed",
+      },
+      ...defaultOutcomeAnnounce,
+    });
+
+    const call = agentSpy.mock.calls[0]?.[0] as {
+      params?: { message?: string; sessionKey?: string };
+    };
+    const msg = call?.params?.message as string;
+    expect(call?.params?.sessionKey).toBe("agent:main:main");
+    expect(msg).toContain("[System Notice] code=delivery_fallback_outbound_send_failed");
+    expect(msg).toContain("This result is being routed to this session as a fallback");
+    expect(msg).toContain(
+      "Write the user-facing text in the same language as the requester's most recent user message in this session;",
+    );
+    expect(msg).toContain(
+      "Include a brief system-style notice that clearly says this is a fallback caused by outbound delivery failure",
+    );
+  });
+
   it("includes success status when outcome is ok", async () => {
     const { runSubagentAnnounceFlow } = await import("./subagent-announce.js");
     // Use waitForCompletion: false so it uses the provided outcome instead of calling agent.wait

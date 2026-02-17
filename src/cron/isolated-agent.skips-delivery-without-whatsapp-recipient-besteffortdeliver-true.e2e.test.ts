@@ -43,6 +43,7 @@ async function runTelegramAnnounceTurn(params: {
   home: string;
   storePath: string;
   deps: CliDeps;
+  sessionKey?: string;
   delivery: {
     mode: "announce";
     channel: string;
@@ -57,6 +58,7 @@ async function runTelegramAnnounceTurn(params: {
     deps: params.deps,
     job: {
       ...makeJob({ kind: "agentTurn", message: "do it" }),
+      ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
       delivery: params.delivery,
     },
     message: "do it",
@@ -243,6 +245,39 @@ describe("runCronIsolatedAgentTurn", () => {
       expect(res.error).toContain("boom");
       expect(runSubagentAnnounceFlow).not.toHaveBeenCalled();
       expect(deps.sendMessageTelegram).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("falls back to the configured session when direct delivery fails", async () => {
+    await withTempCronHome(async (home) => {
+      const storePath = await writeSessionStore(home, { lastProvider: "webchat", lastTo: "" });
+      const deps = createCliDeps({
+        sendMessageTelegram: vi.fn().mockRejectedValue(new Error("boom")),
+      });
+      mockAgentPayloads([{ text: "hello from cron" }]);
+
+      const res = await runTelegramAnnounceTurn({
+        home,
+        storePath,
+        deps,
+        sessionKey: "agent:main:wecom:dm:fallback-user",
+        delivery: { mode: "announce", channel: "telegram", to: "123" },
+      });
+
+      expect(res.status).toBe("ok");
+      expect(res.delivered).toBe(true);
+      expect(deps.sendMessageTelegram).toHaveBeenCalledTimes(1);
+      expect(runSubagentAnnounceFlow).toHaveBeenCalledTimes(1);
+      const fallbackArgs = vi.mocked(runSubagentAnnounceFlow).mock.calls[0]?.[0] as
+        | {
+            requesterSessionKey?: string;
+            requesterOrigin?: { channel?: string };
+            deliveryFallback?: { error?: string };
+          }
+        | undefined;
+      expect(fallbackArgs?.requesterSessionKey).toBe("agent:main:wecom:dm:fallback-user");
+      expect(fallbackArgs?.requesterOrigin?.channel).toBe("webchat");
+      expect(fallbackArgs?.deliveryFallback?.error).toContain("boom");
     });
   });
 

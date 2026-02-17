@@ -52,6 +52,7 @@ import {
   getHookType,
   isExternalHookSession,
 } from "../../security/external-content.js";
+import { INTERNAL_MESSAGE_CHANNEL } from "../../utils/message-channel.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
 import type { CronJob, CronRunOutcome, CronRunTelemetry } from "../types.js";
 import { resolveDeliveryTarget } from "./delivery-target.js";
@@ -98,6 +99,14 @@ function resolveCronDeliveryBestEffort(job: CronJob): boolean {
     return job.payload.bestEffortDeliver;
   }
   return false;
+}
+
+function resolveCronFallbackSessionKey(job: CronJob): string | undefined {
+  if (typeof job.sessionKey !== "string") {
+    return undefined;
+  }
+  const trimmed = job.sessionKey.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export type RunCronAgentTurnResult = {
@@ -536,6 +545,11 @@ export async function runCronIsolatedAgentTurn(params: {
     (deliveryPayload?.mediaUrls?.length ?? 0) > 0 ||
     Object.keys(deliveryPayload?.channelData ?? {}).length > 0;
   const deliveryBestEffort = resolveCronDeliveryBestEffort(params.job);
+  const fallbackSessionKey = resolveCronFallbackSessionKey(params.job);
+  const taskLabel =
+    typeof params.job.name === "string" && params.job.name.trim()
+      ? params.job.name.trim()
+      : `cron:${params.job.id}`;
 
   // Skip delivery for heartbeat-only responses (HEARTBEAT_OK with no real content).
   const ackMaxChars = resolveHeartbeatAckMaxChars(agentCfg);
@@ -555,7 +569,57 @@ export async function runCronIsolatedAgentTurn(params: {
   // Keep this strict so timer fallback can safely decide whether to wake main.
   let delivered = skipMessagingToolDelivery;
   if (deliveryRequested && !skipHeartbeatDelivery && !skipMessagingToolDelivery) {
+    const runDeliveryFailureFallback = async (failureReason: string): Promise<boolean> => {
+      if (!fallbackSessionKey) {
+        return false;
+      }
+      const fallbackReply =
+        synthesizedText?.trim() || outputText?.trim() || summary?.trim() || "(no output)";
+      try {
+        const didAnnounce = await runSubagentAnnounceFlow({
+          childSessionKey: agentSessionKey,
+          childRunId: `${params.job.id}:${runSessionId}:delivery-fallback`,
+          requesterSessionKey: fallbackSessionKey,
+          requesterOrigin: {
+            channel: INTERNAL_MESSAGE_CHANNEL,
+          },
+          requesterDisplayKey: fallbackSessionKey,
+          task: taskLabel,
+          timeoutMs,
+          cleanup: params.job.deleteAfterRun ? "delete" : "keep",
+          roundOneReply: fallbackReply,
+          waitForCompletion: false,
+          startedAt: runStartedAt,
+          endedAt: runEndedAt,
+          outcome: { status: "error", error: failureReason },
+          announceType: "cron job",
+          deliveryFallback: {
+            channel: resolvedDelivery.channel,
+            to: resolvedDelivery.to,
+            error: failureReason,
+          },
+        });
+        if (!didAnnounce) {
+          return false;
+        }
+        logWarn(
+          `[cron:${params.job.id}] outbound delivery failed; routed fallback to session ${fallbackSessionKey}`,
+        );
+        return true;
+      } catch (err) {
+        logWarn(
+          `[cron:${params.job.id}] fallback session delivery failed (${fallbackSessionKey}): ${String(err)}`,
+        );
+        return false;
+      }
+    };
+
     if (resolvedDelivery.error) {
+      const fallbackDelivered = await runDeliveryFailureFallback(resolvedDelivery.error.message);
+      if (fallbackDelivered) {
+        delivered = true;
+        return withRunSession({ status: "ok", summary, outputText, delivered });
+      }
       if (!deliveryBestEffort) {
         return withRunSession({
           status: "error",
@@ -570,6 +634,11 @@ export async function runCronIsolatedAgentTurn(params: {
     }
     if (!resolvedDelivery.to) {
       const message = "cron delivery target is missing";
+      const fallbackDelivered = await runDeliveryFailureFallback(message);
+      if (fallbackDelivered) {
+        delivered = true;
+        return withRunSession({ status: "ok", summary, outputText, delivered });
+      }
       if (!deliveryBestEffort) {
         return withRunSession({
           status: "error",
@@ -613,7 +682,10 @@ export async function runCronIsolatedAgentTurn(params: {
           delivered = deliveryResults.length > 0;
         }
       } catch (err) {
-        if (!deliveryBestEffort) {
+        const fallbackDelivered = await runDeliveryFailureFallback(String(err));
+        if (fallbackDelivered) {
+          delivered = true;
+        } else if (!deliveryBestEffort) {
           return withRunSession({
             status: "error",
             summary,
@@ -628,10 +700,6 @@ export async function runCronIsolatedAgentTurn(params: {
         cfg: params.cfg,
         agentId,
       });
-      const taskLabel =
-        typeof params.job.name === "string" && params.job.name.trim()
-          ? params.job.name.trim()
-          : `cron:${params.job.id}`;
       const initialSynthesizedText = synthesizedText.trim();
       let activeSubagentRuns = countActiveDescendantRuns(agentSessionKey);
       const expectedSubagentFollowup = expectsSubagentFollowup(initialSynthesizedText);
