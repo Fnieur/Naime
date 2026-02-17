@@ -158,8 +158,8 @@ function createOpenAIResponsesStoreWrapper(baseStreamFn: StreamFn | undefined): 
 }
 
 /**
- * Create a streamFn wrapper that adds OpenRouter app attribution headers.
- * These headers allow OpenClaw to appear on OpenRouter's leaderboard.
+ * Map OpenClaw's ThinkLevel to OpenRouter's reasoning.effort values.
+ * "off" maps to "none"; all other levels pass through as-is.
  */
 function mapThinkingLevelToOpenRouterReasoningEffort(
   thinkingLevel: ThinkLevel,
@@ -170,6 +170,10 @@ function mapThinkingLevelToOpenRouterReasoningEffort(
   return thinkingLevel;
 }
 
+/**
+ * Create a streamFn wrapper that adds OpenRouter app attribution headers
+ * and injects reasoning.effort based on the configured thinking level.
+ */
 function createOpenRouterWrapper(
   baseStreamFn: StreamFn | undefined,
   thinkingLevel?: ThinkLevel,
