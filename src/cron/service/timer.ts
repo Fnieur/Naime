@@ -1,6 +1,7 @@
 import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
 import type { CronJob, CronRunOutcome, CronRunStatus, CronRunTelemetry } from "../types.js";
 import type { CronEvent, CronServiceState } from "./state.js";
+import { resolveFailoverReasonFromError } from "../../agents/failover-error.js";
 import { DEFAULT_AGENT_ID } from "../../routing/session-key.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
 import { sweepCronRunSessions } from "../session-reaper.js";
@@ -66,6 +67,7 @@ function applyJobResult(
   result: {
     status: CronRunStatus;
     error?: string;
+    errorReason?: ReturnType<typeof resolveFailoverReasonFromError>;
     startedAt: number;
     endedAt: number;
   },
@@ -75,6 +77,8 @@ function applyJobResult(
   job.state.lastStatus = result.status;
   job.state.lastDurationMs = Math.max(0, result.endedAt - result.startedAt);
   job.state.lastError = result.error;
+  job.state.lastErrorReason =
+    result.status === "error" && result.errorReason ? result.errorReason : undefined;
   job.updatedAtMs = result.endedAt;
 
   // Track consecutive errors for backoff / auto-disable.
@@ -285,9 +289,15 @@ export async function onTimer(state: CronServiceState) {
             continue;
           }
 
+          const errorReason =
+            result.status === "error" && typeof result.error === "string"
+              ? resolveFailoverReasonFromError(result.error)
+              : null;
+
           const shouldDelete = applyJobResult(state, job, {
             status: result.status,
             error: result.error,
+            errorReason: errorReason ?? undefined,
             startedAt: result.startedAt,
             endedAt: result.endedAt,
           });
