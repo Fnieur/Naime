@@ -44,7 +44,7 @@ function isRecoverableToolError(error: string | undefined): boolean {
   return RECOVERABLE_TOOL_ERROR_KEYWORDS.some((keyword) => errorLower.includes(keyword));
 }
 
-function isRecoverableMessageReactInputError(lastToolError: LastToolError): boolean {
+function isRecoverableMessageReactMessageIdInputError(lastToolError: LastToolError): boolean {
   const normalizedTool = lastToolError.toolName.trim().toLowerCase();
   if (normalizedTool !== "message") {
     return false;
@@ -58,7 +58,11 @@ function isRecoverableMessageReactInputError(lastToolError: LastToolError): bool
   if (!isReactAction && !isReactMeta) {
     return false;
   }
-  return isRecoverableToolError(lastToolError.error);
+  const normalizedError = (lastToolError.error ?? "").trim().toLowerCase();
+  if (!normalizedError || !isRecoverableToolError(normalizedError)) {
+    return false;
+  }
+  return normalizedError.includes("messageid") || normalizedError.includes("message id");
 }
 
 function shouldShowToolErrorWarning(params: {
@@ -69,7 +73,7 @@ function shouldShowToolErrorWarning(params: {
 }): boolean {
   // `message.react` without a `messageId` is a common recoverable planning miss.
   // Suppress it here to avoid leaking noisy warning texts back into chats.
-  if (isRecoverableMessageReactInputError(params.lastToolError)) {
+  if (isRecoverableMessageReactMessageIdInputError(params.lastToolError)) {
     return false;
   }
   if (params.suppressToolErrorWarnings) {
