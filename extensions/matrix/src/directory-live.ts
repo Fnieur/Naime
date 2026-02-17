@@ -127,15 +127,15 @@ export async function listMatrixDirectoryGroupsLive(params: {
   query?: string | null;
   limit?: number | null;
 }): Promise<ChannelDirectoryEntry[]> {
-  const query = normalizeQuery(params.query);
-  if (!query) {
+  const trimmed = params.query?.trim() ?? "";
+  if (!trimmed) {
     return [];
   }
   const auth = await resolveMatrixAuth({ cfg: params.cfg as never, accountId: params.accountId });
   const limit = typeof params.limit === "number" && params.limit > 0 ? params.limit : 20;
 
-  if (query.startsWith("#")) {
-    const roomId = await resolveMatrixRoomAlias(auth.homeserver, auth.accessToken, query);
+  if (trimmed.startsWith("#")) {
+    const roomId = await resolveMatrixRoomAlias(auth.homeserver, auth.accessToken, trimmed);
     if (!roomId) {
       return [];
     }
@@ -143,22 +143,23 @@ export async function listMatrixDirectoryGroupsLive(params: {
       {
         kind: "group",
         id: roomId,
-        name: query,
-        handle: query,
+        name: trimmed,
+        handle: trimmed,
       } satisfies ChannelDirectoryEntry,
     ];
   }
 
-  if (query.startsWith("!")) {
+  if (trimmed.startsWith("!")) {
     return [
       {
         kind: "group",
-        id: query,
-        name: query,
+        id: trimmed,
+        name: trimmed,
       } satisfies ChannelDirectoryEntry,
     ];
   }
 
+  const query = trimmed.toLowerCase();
   const joined = await fetchMatrixJson<MatrixJoinedRoomsResponse>({
     homeserver: auth.homeserver,
     accessToken: auth.accessToken,

@@ -23,6 +23,7 @@ Docs: https://docs.openclaw.ai
 
 ### Fixes
 
+- Matrix: preserve original casing for room IDs and aliases in directory resolution so per-room config (requireMention, autoReply) is matched correctly. (#19278)
 - macOS/Update: correct the Sparkle appcast version for 2026.2.15 so updates are offered again. (#18201)
 - Gateway/Auth: clear stale device-auth tokens after device token mismatch errors so re-paired clients can re-auth. (#18201)
 - Voice call/Gateway: prevent overlapping closed-loop turn races with per-call turn locking, route transcript dedupe via source-aware fingerprints with strict cache eviction bounds, and harden `voicecall latency` stats for large logs without spread-operator stack overflow. (#19140) Thanks @mbelinky.
