@@ -130,14 +130,15 @@ export async function createEmbeddingProvider(
 
     // If unified system exhausted all providers → noop, use hash instead.
     // Hash provides n-gram vector similarity which is better than noop (BM25-only).
-    if (result.provider.id === "none") {
+    const provider = result.provider;
+    if (!provider || provider.id === "none") {
       logger?.info?.(
         "[memory-context] embedding: using hash (keyword overlap, no semantic search)",
       );
       return createHashEmbedding(384);
     }
 
-    const adapter = wrapUnifiedProvider(result.provider, logger);
+    const adapter = wrapUnifiedProvider(provider, logger);
     await adapter.init?.();
 
     // If probe failed (e.g. Gemini region restriction), dim stays 0.

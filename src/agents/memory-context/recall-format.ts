@@ -93,13 +93,14 @@ export function buildRecalledContextBlock(
 
   // Apply hard cap to detail segments
   const detailWithScores = details.map((d) => ({
+    id: d.segment.id,
     content: d.segment.content,
     score: d.score,
   }));
   const cappedDetails = enforceHardCap(detailWithScores, detailBudget);
-  // Map back to original segments (cappedDetails are sorted by score desc)
+  // Map back to original segments by id (unique) instead of content (may duplicate)
   const includedDetails = cappedDetails
-    .map((cd) => details.find((d) => d.segment.content === cd.content))
+    .map((cd) => details.find((d) => d.segment.id === cd.id))
     .filter(Boolean) as typeof details;
 
   // Build blocks

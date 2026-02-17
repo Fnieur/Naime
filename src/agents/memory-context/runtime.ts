@@ -77,11 +77,11 @@ export function estimateTokens(text: string): number {
  * (lowest score first) until total tokens <= hardCap.
  */
 export function enforceHardCap(
-  segments: Array<{ content: string; score: number }>,
+  segments: Array<{ content: string; score: number; id?: string }>,
   hardCap: number,
-): Array<{ content: string; score: number }> {
+): Array<{ content: string; score: number; id?: string }> {
   const sorted = [...segments].toSorted((a, b) => b.score - a.score);
-  const result: Array<{ content: string; score: number }> = [];
+  const result: Array<{ content: string; score: number; id?: string }> = [];
   let totalTokens = 0;
 
   for (const seg of sorted) {

@@ -48,11 +48,12 @@ function extractText(msg: AgentMessage): string {
 /**
  * Check if a message is a channel-injected system prefix (e.g. Feishu metadata).
  * These contain no user intent and should be excluded from search queries.
- * Matches both "System: [2026-02-15 ..." and "[Sun 2026-02-15 ..." formats.
- * Imported from shared.ts as the canonical source.
+ * Matches "System: [2026-02-15 ...", "[Sun 2026-02-15 ...", and "[2026-02-15 ..." (no day name).
+ * Must stay in sync with shared.ts SYSTEM_PREFIX_RE.
  */
 // Re-export for local use; canonical definition is in shared.ts
-const SYSTEM_PREFIX_RE = /^(?:System:\s*)?\[(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+\d{4}-\d{2}-\d{2}\s/;
+const SYSTEM_PREFIX_RE =
+  /^(?:System:\s*)?\[(?:(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+)?\d{4}-\d{2}-\d{2}\s/;
 
 /**
  * Extract search query from last 2-3 user messages (broader keyword coverage).
