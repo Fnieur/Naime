@@ -568,7 +568,7 @@ export async function runCronIsolatedAgentTurn(params: {
       logWarn(`[cron:${params.job.id}] ${resolvedDelivery.error.message}`);
       return withRunSession({ status: "ok", summary, outputText, ...telemetry });
     }
-    if (!resolvedDelivery.to) {
+    if (!resolvedDelivery.to && !synthesizedText) {
       const message = "cron delivery target is missing";
       if (!deliveryBestEffort) {
         return withRunSession({
@@ -589,7 +589,10 @@ export async function runCronIsolatedAgentTurn(params: {
     // identity, or structured content, prefer direct outbound delivery to send
     // the actual cron output without summarization.
     const hasExplicitDeliveryTarget = Boolean(deliveryPlan.to);
-    if (deliveryPayloadHasStructuredContent || identity || hasExplicitDeliveryTarget) {
+    if (
+      resolvedDelivery.to &&
+      (deliveryPayloadHasStructuredContent || identity || hasExplicitDeliveryTarget)
+    ) {
       try {
         const payloadsForDelivery =
           deliveryPayloadHasStructuredContent && deliveryPayloads.length > 0
