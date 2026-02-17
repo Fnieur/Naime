@@ -230,6 +230,7 @@ export async function handleTelegramAction(
     });
     return jsonResult(result);
   }
+
   if (action === "deleteMessage") {
     if (!isActionEnabled("deleteMessage")) {
       throw new Error("Telegram deleteMessage is disabled.");
