@@ -23,13 +23,17 @@ export function extractAnthropicRateLimitState(
   headers: Record<string, string>,
 ): AnthropicRateLimitState {
   const parseNumber = (value: string | undefined): number | null => {
-    if (!value) return null;
+    if (!value) {
+      return null;
+    }
     const parsed = parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : null;
   };
 
   const parseDate = (value: string | undefined): Date | null => {
-    if (!value) return null;
+    if (!value) {
+      return null;
+    }
     try {
       return new Date(value);
     } catch {
@@ -58,8 +62,12 @@ export function getCapacityPercentage(
   limit: number | null,
   remaining: number | null,
 ): number | null {
-  if (limit === null || remaining === null) return null;
-  if (limit === 0) return null;
+  if (limit === null || remaining === null) {
+    return null;
+  }
+  if (limit === 0) {
+    return null;
+  }
   return (limit - remaining) / limit;
 }
 
@@ -87,7 +95,9 @@ export function recommendSpawnDelayMs(capacityPercentage: number | null): number
  * Determine if we should warn about approaching rate limits.
  */
 export function shouldWarnRateLimit(capacityPercentage: number | null, warnAt: number): boolean {
-  if (capacityPercentage === null) return false;
+  if (capacityPercentage === null) {
+    return false;
+  }
   return capacityPercentage >= warnAt;
 }
 
@@ -95,7 +105,9 @@ export function shouldWarnRateLimit(capacityPercentage: number | null, warnAt: n
  * Determine if we should halt spawning to avoid rate limit errors.
  */
 export function shouldHaltSpawning(capacityPercentage: number | null, haltAt: number): boolean {
-  if (capacityPercentage === null) return false;
+  if (capacityPercentage === null) {
+    return false;
+  }
   return capacityPercentage >= haltAt;
 }
 

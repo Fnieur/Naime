@@ -170,7 +170,7 @@ const OPENROUTER_RETRY_RE =
 const CLOUDFLARE_BLOCK_RE = /cloudflare|cf-ray|challenge-platform|1020.*access denied/i;
 
 function getOpenRouterRetryAfterMs(err: unknown): number | undefined {
-  if (!err || typeof err !== "object") return undefined;
+  if (!err || typeof err !== "object") {return undefined;}
 
   // Cloudflare blocks: back off 60s minimum
   if (CLOUDFLARE_BLOCK_RE.test(formatErrorMessage(err))) {

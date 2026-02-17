@@ -1,9 +1,9 @@
-import type { StreamFn } from "@mariozechner/pi-agent-core";
+import type { AssistantMessageEventStream } from "@mariozechner/pi-ai";
 import { createAssistantMessageEventStream } from "@mariozechner/pi-ai";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createOpenRouterPromptCacheWrapper } from "./openrouter-prompt-cache.js";
 
-function createMockStream(): any {
+function createMockStream(): AssistantMessageEventStream {
   return createAssistantMessageEventStream();
 }
 
@@ -11,7 +11,7 @@ describe("OpenRouter Prompt Cache", () => {
   it("should detect cacheable models", () => {
     // Should create wrapper for Gemini
     const geminiWrapper = createOpenRouterPromptCacheWrapper(
-      createMockStream() as StreamFn,
+      createMockStream() as any,
       "openrouter",
       "google/gemini-3-flash-preview",
     );
@@ -19,7 +19,7 @@ describe("OpenRouter Prompt Cache", () => {
 
     // Should create wrapper for Claude via OpenRouter
     const claudeWrapper = createOpenRouterPromptCacheWrapper(
-      createMockStream() as StreamFn,
+      createMockStream() as any,
       "openrouter",
       "anthropic/claude-sonnet-4-5",
     );
@@ -27,7 +27,7 @@ describe("OpenRouter Prompt Cache", () => {
 
     // Should not create wrapper for non-OpenRouter
     const anthropicWrapper = createOpenRouterPromptCacheWrapper(
-      createMockStream() as StreamFn,
+      createMockStream() as any,
       "anthropic",
       "claude-sonnet-4-5",
     );
@@ -35,7 +35,7 @@ describe("OpenRouter Prompt Cache", () => {
 
     // Should not create wrapper for non-cacheable OpenRouter models
     const autoWrapper = createOpenRouterPromptCacheWrapper(
-      createMockStream() as StreamFn,
+      createMockStream() as any,
       "openrouter",
       "auto",
     );
@@ -46,37 +46,31 @@ describe("OpenRouter Prompt Cache", () => {
     return new Promise<void>((resolve) => {
       // Use a long system prompt to ensure it gets cached
       const longSystemPrompt =
-        "You are a helpful assistant. " +
-        "a".repeat(2000) +
-        " Always be helpful and provide clear explanations.";
+        "You are a helpful assistant. " + "a".repeat(2000) + " Always be helpful and provide clear explanations.";
 
-      const mockStreamFn: StreamFn = (model, context, options) => {
+      const mockStreamFn = ((_model: any, _context: any, options: any) => {
         const payload = {
           system: longSystemPrompt,
           messages: [],
         };
         options?.onPayload?.(payload);
-        return createAssistantMessageEventStream();
-      };
+        return createMockStream();
+      }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(
-        mockStreamFn,
-        "openrouter",
-        "google/gemini-3-flash-preview",
-      );
+      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
       }
 
-      wrapper({} as any, {} as any, {
+      void wrapper({} as any, {} as any, {
         onPayload: (payload: any) => {
           expect(payload.system).toBeDefined();
           expect(Array.isArray(payload.system)).toBe(true);
 
-          const systemBlocks = payload.system as any[];
+          const systemBlocks = payload.system as unknown[];
           // All blocks should have cache_control for system prompts
-          expect(systemBlocks.every((b) => b.cache_control)).toBe(true);
+          expect(systemBlocks.every((b: any) => b.cache_control)).toBe(true);
           resolve();
         },
       });
@@ -87,7 +81,7 @@ describe("OpenRouter Prompt Cache", () => {
     return new Promise<void>((resolve) => {
       const longText = "a".repeat(2000); // Long enough to cache
 
-      const mockStreamFn: StreamFn = (model, context, options) => {
+      const mockStreamFn = ((_model: any, _context: any, options: any) => {
         const payload = {
           messages: [
             {
@@ -97,26 +91,22 @@ describe("OpenRouter Prompt Cache", () => {
           ],
         };
         options?.onPayload?.(payload);
-        return createAssistantMessageEventStream();
-      };
+        return createMockStream();
+      }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(
-        mockStreamFn,
-        "openrouter",
-        "google/gemini-3-flash-preview",
-      );
+      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
       }
 
-      wrapper({} as any, {} as any, {
+      void wrapper({} as any, {} as any, {
         onPayload: (payload: any) => {
-          const messages = payload.messages as any[];
+          const messages = payload.messages as unknown[];
           expect(messages).toHaveLength(1);
-          expect(Array.isArray(messages[0].content)).toBe(true);
+          expect(Array.isArray((messages[0] as any).content)).toBe(true);
 
-          const contentBlocks = messages[0].content as any[];
+          const contentBlocks = (messages[0] as any).content as any[];
           // Should have cache_control on at least one block
           expect(contentBlocks.some((b) => b.cache_control)).toBe(true);
 
@@ -134,7 +124,7 @@ describe("OpenRouter Prompt Cache", () => {
     return new Promise<void>((resolve) => {
       const shortText = "Hi there";
 
-      const mockStreamFn: StreamFn = (model, context, options) => {
+      const mockStreamFn = ((_model: any, _context: any, options: any) => {
         const payload = {
           messages: [
             {
@@ -144,26 +134,22 @@ describe("OpenRouter Prompt Cache", () => {
           ],
         };
         options?.onPayload?.(payload);
-        return createAssistantMessageEventStream();
-      };
+        return createMockStream();
+      }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(
-        mockStreamFn,
-        "openrouter",
-        "google/gemini-3-flash-preview",
-      );
+      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
       }
 
-      wrapper({} as any, {} as any, {
+      void wrapper({} as any, {} as any, {
         onPayload: (payload: any) => {
-          const messages = payload.messages as any[];
+          const messages = payload.messages as unknown[];
           expect(messages).toHaveLength(1);
-          expect(Array.isArray(messages[0].content)).toBe(true);
+          expect(Array.isArray((messages[0] as any).content)).toBe(true);
 
-          const contentBlocks = messages[0].content as any[];
+          const contentBlocks = (messages[0] as any).content as any[];
           // Short messages should not have cache_control
           expect(contentBlocks.every((b) => !b.cache_control)).toBe(true);
 
@@ -175,7 +161,7 @@ describe("OpenRouter Prompt Cache", () => {
 
   it("should preserve assistant messages without caching", async () => {
     return new Promise<void>((resolve) => {
-      const mockStreamFn: StreamFn = (model, context, options) => {
+      const mockStreamFn = ((_model: any, _context: any, options: any) => {
         const payload = {
           messages: [
             {
@@ -191,23 +177,19 @@ describe("OpenRouter Prompt Cache", () => {
           ],
         };
         options?.onPayload?.(payload);
-        return createAssistantMessageEventStream();
-      };
+        return createMockStream();
+      }) as any;
 
-      const wrapper = createOpenRouterPromptCacheWrapper(
-        mockStreamFn,
-        "openrouter",
-        "google/gemini-3-flash-preview",
-      );
+      const wrapper = createOpenRouterPromptCacheWrapper(mockStreamFn, "openrouter", "google/gemini-3-flash-preview");
 
       if (!wrapper) {
         throw new Error("Wrapper not created");
       }
 
-      wrapper({} as any, {} as any, {
+      void wrapper({} as any, {} as any, {
         onPayload: (payload: any) => {
-          const messages = payload.messages as any[];
-          const assistantContent = messages[0].content as any[];
+          const messages = payload.messages as unknown[];
+          const assistantContent = (messages[0] as any).content as any[];
 
           // Assistant messages should pass through unchanged
           // (they shouldn't have cache_control added or removed)

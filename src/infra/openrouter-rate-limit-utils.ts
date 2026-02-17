@@ -247,7 +247,9 @@ export function isFreeModelExhausted(
   dailyLimit = 200,
 ): boolean {
   const profile = getModelProfile(model);
-  if (!profile.isFree) return false;
+  if (!profile.isFree) {
+    return false;
+  }
   return (state.modelRequestCounts[model] ?? 0) >= dailyLimit;
 }
 
@@ -258,7 +260,9 @@ export function shouldRefreshCredits(
   state: OpenRouterCreditState,
   staleAfterMs = 5 * 60 * 1000,
 ): boolean {
-  if (!state.lastCheckedAt) return true;
+  if (!state.lastCheckedAt) {
+    return true;
+  }
   return Date.now() - state.lastCheckedAt.getTime() > staleAfterMs;
 }
 
@@ -334,15 +338,29 @@ export type ProviderType = "anthropic" | "openrouter" | "local" | "unknown";
 
 export function detectProvider(model: string, baseUrl?: string): ProviderType {
   if (baseUrl) {
-    if (/openrouter\.ai/i.test(baseUrl)) return "openrouter";
-    if (/anthropic\.com/i.test(baseUrl)) return "anthropic";
-    if (/localhost|127\.0\.0\.1|ollama/i.test(baseUrl)) return "local";
+    if (/openrouter\.ai/i.test(baseUrl)) {
+      return "openrouter";
+    }
+    if (/anthropic\.com/i.test(baseUrl)) {
+      return "anthropic";
+    }
+    if (/localhost|127\.0\.0\.1|ollama/i.test(baseUrl)) {
+      return "local";
+    }
   }
   // Model string heuristics
-  if (/^openrouter\//i.test(model)) return "openrouter";
-  if (/^anthropic\//i.test(model)) return "anthropic";
-  if (/^ollama\//i.test(model) || model === "qwen-local") return "local";
+  if (/^openrouter\//i.test(model)) {
+    return "openrouter";
+  }
+  if (/^anthropic\//i.test(model)) {
+    return "anthropic";
+  }
+  if (/^ollama\//i.test(model) || model === "qwen-local") {
+    return "local";
+  }
   // Models routed through OpenRouter typically have org/ prefix
-  if (/^(moonshotai|deepseek|meta-llama|google|mistralai)\//i.test(model)) return "openrouter";
+  if (/^(moonshotai|deepseek|meta-llama|google|mistralai)\//i.test(model)) {
+    return "openrouter";
+  }
   return "unknown";
 }
