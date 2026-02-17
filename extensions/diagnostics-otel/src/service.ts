@@ -538,7 +538,7 @@ export function createDiagnosticsOtelService(): OpenClawPluginService {
       ) => {
         const attrs: Record<string, string> = { "openclaw.state": evt.state };
         if (evt.reason) {
-          attrs["openclaw.reason"] = evt.reason;
+          attrs["openclaw.reason"] = redactSensitiveText(evt.reason);
         }
         sessionStateCounter.add(1, attrs);
       };
