@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { VoiceCallConfigSchema } from "./config.js";
 import { CallManager } from "./manager.js";
+import type { Logger } from "./manager/context.js";
 import type { VoiceCallProvider } from "./providers/base.js";
 import type {
   HangupCallInput,
@@ -46,6 +47,12 @@ class FakeProvider implements VoiceCallProvider {
   }
 }
 
+const logger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+} as unknown as Logger;
+
 describe("CallManager", () => {
   it("upgrades providerCallId mapping when provider ID changes", async () => {
     const config = VoiceCallConfigSchema.parse({
@@ -55,7 +62,7 @@ describe("CallManager", () => {
     });
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(new FakeProvider(), "https://example.com/voice/webhook");
 
     const { callId, success, error } = await manager.initiateCall("+15550000001");
@@ -89,7 +96,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     const { callId, success } = await manager.initiateCall("+15550000002", undefined, {
@@ -123,7 +130,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     manager.processEvent({
@@ -152,7 +159,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     manager.processEvent({
@@ -182,7 +189,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     manager.processEvent({
@@ -211,7 +218,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     manager.processEvent({
@@ -251,7 +258,7 @@ describe("CallManager", () => {
     });
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(new FakeProvider(), "https://example.com/voice/webhook");
 
     manager.processEvent({
@@ -278,7 +285,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     const started = await manager.initiateCall("+15550000003");
@@ -332,7 +339,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     const started = await manager.initiateCall("+15550000004");
@@ -378,7 +385,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     const started = await manager.initiateCall("+15550000005");
@@ -445,7 +452,7 @@ describe("CallManager", () => {
 
     const storePath = path.join(os.tmpdir(), `openclaw-voice-call-test-${Date.now()}`);
     const provider = new FakeProvider();
-    const manager = new CallManager(config, storePath);
+    const manager = new CallManager(config, logger, storePath);
     manager.initialize(provider, "https://example.com/voice/webhook");
 
     const started = await manager.initiateCall("+15550000006");

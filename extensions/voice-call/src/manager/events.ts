@@ -22,33 +22,38 @@ type EventContext = Pick<
   | "provider"
   | "config"
   | "storePath"
+  | "logger"
   | "transcriptWaiters"
   | "maxDurationTimers"
   | "onCallAnswered"
 >;
 
-function shouldAcceptInbound(config: EventContext["config"], from: string | undefined): boolean {
+function shouldAcceptInbound(
+  config: EventContext["config"],
+  from: string | undefined,
+  logger: EventContext["logger"],
+): boolean {
   const { inboundPolicy: policy, allowFrom } = config;
 
   switch (policy) {
     case "disabled":
-      console.log("[voice-call] Inbound call rejected: policy is disabled");
+      logger.info("[voice-call] Inbound call rejected: policy is disabled");
       return false;
 
     case "open":
-      console.log("[voice-call] Inbound call accepted: policy is open");
+      logger.info("[voice-call] Inbound call accepted: policy is open");
       return true;
 
     case "allowlist":
     case "pairing": {
       const normalized = normalizePhoneNumber(from);
       if (!normalized) {
-        console.log("[voice-call] Inbound call rejected: missing caller ID");
+        logger.info("[voice-call] Inbound call rejected: missing caller ID");
         return false;
       }
       const allowed = isAllowlistedCaller(normalized, allowFrom);
       const status = allowed ? "accepted" : "rejected";
-      console.log(
+      logger.info(
         `[voice-call] Inbound call ${status}: ${from} ${allowed ? "is in" : "not in"} allowlist`,
       );
       return allowed;
@@ -87,7 +92,7 @@ function createInboundCall(params: {
   params.ctx.providerCallIdMap.set(params.providerCallId, callId);
   persistCallRecord(params.ctx.storePath, callRecord);
 
-  console.log(`[voice-call] Created inbound call record: ${callId} from ${params.from}`);
+  params.ctx.logger.info(`[voice-call] Created inbound call record: ${callId} from ${params.from}`);
   return callRecord;
 }
 
@@ -104,10 +109,10 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
   });
 
   if (!call && event.direction === "inbound" && event.providerCallId) {
-    if (!shouldAcceptInbound(ctx.config, event.from)) {
+    if (!shouldAcceptInbound(ctx.config, event.from, ctx.logger)) {
       const pid = event.providerCallId;
       if (!ctx.provider) {
-        console.warn(
+        ctx.logger.warn(
           `[voice-call] Inbound call rejected by policy but no provider to hang up (providerCallId: ${pid}, from: ${event.from}); call will time out on provider side.`,
         );
         return;
@@ -117,7 +122,7 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
       }
       ctx.rejectedProviderCallIds.add(pid);
       const callId = event.callId ?? pid;
-      console.log(`[voice-call] Rejecting inbound call by policy: ${pid}`);
+      ctx.logger.info(`[voice-call] Rejecting inbound call by policy: ${pid}`);
       void ctx.provider
         .hangupCall({
           callId,
@@ -126,7 +131,7 @@ export function processEvent(ctx: EventContext, event: NormalizedEvent): void {
         })
         .catch((err) => {
           const message = err instanceof Error ? err.message : String(err);
-          console.warn(`[voice-call] Failed to reject inbound call ${pid}:`, message);
+          ctx.logger.warn(`[voice-call] Failed to reject inbound call ${pid}: ${message}`);
         });
       return;
     }
