@@ -32,7 +32,9 @@ import type {
   PluginHookName,
   PluginHookHandlerMap,
   PluginHookRegistration as TypedPluginHookRegistration,
+  StreamFnWrapperFn,
 } from "./types.js";
+import { loadConfig, writeConfigFile } from "../config/io.js";
 
 export type PluginToolRegistration = {
   pluginId: string;
@@ -94,6 +96,12 @@ export type PluginCommandRegistration = {
   source: string;
 };
 
+export type PluginStreamFnWrapperRegistration = {
+  pluginId: string;
+  wrapper: StreamFnWrapperFn;
+  source: string;
+};
+
 export type PluginRecord = {
   id: string;
   name: string;
@@ -134,6 +142,7 @@ export type PluginRegistry = {
   cliRegistrars: PluginCliRegistration[];
   services: PluginServiceRegistration[];
   commands: PluginCommandRegistration[];
+  streamFnWrappers: PluginStreamFnWrapperRegistration[];
   diagnostics: PluginDiagnostic[];
 };
 
@@ -157,6 +166,7 @@ export function createEmptyPluginRegistry(): PluginRegistry {
     cliRegistrars: [],
     services: [],
     commands: [],
+    streamFnWrappers: [],
     diagnostics: [],
   };
 }
@@ -462,6 +472,58 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     } as TypedPluginHookRegistration);
   };
 
+  const registerStreamFnWrapper = (record: PluginRecord, wrapper: StreamFnWrapperFn) => {
+    registry.streamFnWrappers.push({
+      pluginId: record.id,
+      wrapper,
+      source: record.source,
+    });
+  };
+
+  const updatePluginConfig = async (
+    record: PluginRecord,
+    newConfig: Record<string, unknown>,
+  ) => {
+    // Read fresh config to avoid overwriting concurrent changes
+    const currentConfig = loadConfig();
+    const updated = {
+      ...currentConfig,
+      plugins: {
+        ...currentConfig.plugins,
+        entries: {
+          ...currentConfig.plugins?.entries,
+          [record.id]: {
+            ...currentConfig.plugins?.entries?.[record.id],
+            config: newConfig,
+          },
+        },
+      },
+    };
+    await writeConfigFile(updated);
+  };
+
+  const updatePluginEnabled = async (
+    record: PluginRecord,
+    enabled: boolean,
+  ) => {
+    // Read fresh config to avoid overwriting concurrent changes
+    const currentConfig = loadConfig();
+    const updated = {
+      ...currentConfig,
+      plugins: {
+        ...currentConfig.plugins,
+        entries: {
+          ...currentConfig.plugins?.entries,
+          [record.id]: {
+            ...currentConfig.plugins?.entries?.[record.id],
+            enabled,
+          },
+        },
+      },
+    };
+    await writeConfigFile(updated);
+  };
+
   const normalizeLogger = (logger: PluginLogger): PluginLogger => ({
     info: logger.info,
     warn: logger.warn,
@@ -499,6 +561,9 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       registerCommand: (command) => registerCommand(record, command),
       resolvePath: (input: string) => resolveUserPath(input),
       on: (hookName, handler, opts) => registerTypedHook(record, hookName, handler, opts),
+      registerStreamFnWrapper: (wrapper) => registerStreamFnWrapper(record, wrapper),
+      updatePluginConfig: (newConfig) => updatePluginConfig(record, newConfig),
+      updatePluginEnabled: (enabled) => updatePluginEnabled(record, enabled),
     };
   };
 
@@ -515,5 +580,6 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     registerCommand,
     registerHook,
     registerTypedHook,
+    registerStreamFnWrapper,
   };
 }
