@@ -1,12 +1,17 @@
 import type { StreamFn } from "@mariozechner/pi-agent-core";
+import { createAssistantMessageEventStream } from "@mariozechner/pi-ai";
 import { describe, it, expect } from "vitest";
 import { createOpenRouterPromptCacheWrapper } from "./openrouter-prompt-cache.js";
+
+function createMockStream(): any {
+  return createAssistantMessageEventStream();
+}
 
 describe("OpenRouter Prompt Cache", () => {
   it("should detect cacheable models", () => {
     // Should create wrapper for Gemini
     const geminiWrapper = createOpenRouterPromptCacheWrapper(
-      (() => {}) as StreamFn,
+      createMockStream() as StreamFn,
       "openrouter",
       "google/gemini-3-flash-preview",
     );
@@ -14,7 +19,7 @@ describe("OpenRouter Prompt Cache", () => {
 
     // Should create wrapper for Claude via OpenRouter
     const claudeWrapper = createOpenRouterPromptCacheWrapper(
-      (() => {}) as StreamFn,
+      createMockStream() as StreamFn,
       "openrouter",
       "anthropic/claude-sonnet-4-5",
     );
@@ -22,7 +27,7 @@ describe("OpenRouter Prompt Cache", () => {
 
     // Should not create wrapper for non-OpenRouter
     const anthropicWrapper = createOpenRouterPromptCacheWrapper(
-      (() => {}) as StreamFn,
+      createMockStream() as StreamFn,
       "anthropic",
       "claude-sonnet-4-5",
     );
@@ -30,7 +35,7 @@ describe("OpenRouter Prompt Cache", () => {
 
     // Should not create wrapper for non-cacheable OpenRouter models
     const autoWrapper = createOpenRouterPromptCacheWrapper(
-      (() => {}) as StreamFn,
+      createMockStream() as StreamFn,
       "openrouter",
       "auto",
     );
@@ -51,7 +56,7 @@ describe("OpenRouter Prompt Cache", () => {
           messages: [],
         };
         options?.onPayload?.(payload);
-        return Promise.resolve("");
+        return createAssistantMessageEventStream();
       };
 
       const wrapper = createOpenRouterPromptCacheWrapper(
@@ -92,7 +97,7 @@ describe("OpenRouter Prompt Cache", () => {
           ],
         };
         options?.onPayload?.(payload);
-        return Promise.resolve("");
+        return createAssistantMessageEventStream();
       };
 
       const wrapper = createOpenRouterPromptCacheWrapper(
@@ -139,7 +144,7 @@ describe("OpenRouter Prompt Cache", () => {
           ],
         };
         options?.onPayload?.(payload);
-        return Promise.resolve("");
+        return createAssistantMessageEventStream();
       };
 
       const wrapper = createOpenRouterPromptCacheWrapper(
@@ -186,7 +191,7 @@ describe("OpenRouter Prompt Cache", () => {
           ],
         };
         options?.onPayload?.(payload);
-        return Promise.resolve("");
+        return createAssistantMessageEventStream();
       };
 
       const wrapper = createOpenRouterPromptCacheWrapper(
