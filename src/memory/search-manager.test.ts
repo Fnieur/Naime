@@ -70,7 +70,7 @@ vi.mock("./manager.js", () => ({
 
 import { QmdMemoryManager } from "./qmd-manager.js";
 import { getMemorySearchManager } from "./search-manager.js";
-const createQmdManagerMock = vi.mocked(QmdMemoryManager.create.bind(QmdMemoryManager));
+const createQmdManagerMock = vi.spyOn(QmdMemoryManager, "create");
 
 type SearchManagerResult = Awaited<ReturnType<typeof getMemorySearchManager>>;
 type SearchManager = NonNullable<SearchManagerResult["manager"]>;
