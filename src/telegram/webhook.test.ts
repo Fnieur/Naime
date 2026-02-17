@@ -1,27 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import { startTelegramWebhook } from "./webhook.js";
 
-const { handlerSpy, setWebhookSpy, webhookCallbackSpy, createTelegramBotSpy } = vi.hoisted(() => {
-  const handler = vi.fn(
+const handlerSpy = vi.hoisted(() =>
+  vi.fn(
     (_req: unknown, res: { writeHead: (status: number) => void; end: (body?: string) => void }) => {
       res.writeHead(200);
       res.end("ok");
     },
-  );
-  const setWebhook = vi.fn();
-  const stop = vi.fn();
-  const webhookCallback = vi.fn(() => handler);
-  const createTelegramBot = vi.fn(() => ({
-    api: { setWebhook },
-    stop,
-  }));
-  return {
-    handlerSpy: handler,
-    setWebhookSpy: setWebhook,
-    webhookCallbackSpy: webhookCallback,
-    createTelegramBotSpy: createTelegramBot,
-  };
-});
+  ),
+);
+const setWebhookSpy = vi.hoisted(() => vi.fn());
+const stopSpy = vi.hoisted(() => vi.fn());
+const webhookCallbackSpy = vi.hoisted(() => vi.fn(() => handlerSpy));
+const createTelegramBotSpy = vi.hoisted(() =>
+  vi.fn(() => ({
+    api: { setWebhook: setWebhookSpy },
+    stop: stopSpy,
+  })),
+);
 
 vi.mock("grammy", async (importOriginal) => {
   const actual = await importOriginal<typeof import("grammy")>();
