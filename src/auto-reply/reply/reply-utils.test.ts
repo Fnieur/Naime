@@ -137,6 +137,16 @@ describe("normalizeReplyPayload", () => {
     expect(normalizeReplyPayload({ text: stacked }, { heartbeatPrompt: customPrompt })).toBeNull();
   });
 
+  it("does not suppress prompts that include actual reply content", () => {
+    const customPrompt = resolveHeartbeatPrompt("Check HEARTBEAT.md and reply HEARTBEAT_OK.");
+    const text = `${customPrompt} Thanks, done.`;
+
+    const normalized = normalizeReplyPayload({ text }, { heartbeatPrompt: customPrompt });
+
+    expect(normalized).not.toBeNull();
+    expect(normalized?.text).toBe(text);
+  });
+
   it("does not suppress legitimate messages mentioning heartbeat.md", () => {
     const normalized = normalizeReplyPayload({
       text: "Please read heartbeat.md and summarize it.",

@@ -1,7 +1,7 @@
+import type { ReplyPayload } from "../types.js";
 import { sanitizeUserFacingText } from "../../agents/pi-embedded-helpers.js";
 import { resolveHeartbeatPrompt, stripHeartbeatToken } from "../heartbeat.js";
 import { HEARTBEAT_TOKEN, isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
-import type { ReplyPayload } from "../types.js";
 import { hasLineDirectives, parseLineDirectives } from "./line-directives.js";
 import {
   resolveResponsePrefixTemplate,
@@ -58,6 +58,8 @@ export function normalizeReplyPayload(
     }
     let rest = normalized;
     while (rest.startsWith(resolvedHeartbeatPrompt)) {
+      // Only suppress payloads that are exactly the heartbeat prompt (possibly repeated/stacked).
+      // Prefix matches with additional content are treated as real replies and must not be dropped.
       rest = rest.slice(resolvedHeartbeatPrompt.length).trimStart();
       if (!rest) {
         return true;
