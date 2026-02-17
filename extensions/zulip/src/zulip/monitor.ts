@@ -791,6 +791,7 @@ export async function monitorZulipProvider(opts: MonitorZulipOpts = {}): Promise
         lastEventId,
         timeoutMs: 90000,
         retryBaseDelayMs: 1000,
+        signal: opts.abortSignal,
       });
 
       if (response.result === "error") {
@@ -870,10 +871,10 @@ export async function monitorZulipProvider(opts: MonitorZulipOpts = {}): Promise
       if (!pollBackoffMs) {
         pollBackoffMs = baseDelay;
       } else {
-        pollBackoffMs = Math.min(30000, pollBackoffMs * 2);
+        pollBackoffMs = Math.min(120000, pollBackoffMs * 2);
       }
       const waitMs =
-        retryAfterMs && retryAfterMs > 0 ? Math.min(30000, retryAfterMs) : pollBackoffMs;
+        retryAfterMs && retryAfterMs > 0 ? Math.min(120000, retryAfterMs) : pollBackoffMs;
       await delay(waitMs);
     }
   }

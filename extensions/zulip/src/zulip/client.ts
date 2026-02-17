@@ -171,7 +171,7 @@ export async function zulipRequestWithRetry<T>(
 ): Promise<T> {
   const maxRetries = options?.maxRetries ?? 3;
   const baseDelayMs = options?.baseDelayMs ?? 1000;
-  const maxDelayMs = options?.maxDelayMs ?? 30000;
+  const maxDelayMs = options?.maxDelayMs ?? 120000;
   const retryStatuses = new Set(options?.retryStatuses ?? [429, 502, 503, 504]);
   const rateLimitDelayMs = options?.rateLimitDelayMs ?? baseDelayMs;
 
@@ -202,7 +202,9 @@ export async function zulipRequestWithRetry<T>(
 
     const base = status === 429 ? rateLimitDelayMs : baseDelayMs;
     const backoff = Math.min(maxDelayMs, base * 2 ** attempt);
-    const waitMs = retryAfterMs && retryAfterMs > 0 ? Math.min(maxDelayMs, retryAfterMs) : backoff;
+    const jitter = Math.random() * 0.2 * backoff; // up to 20% jitter
+    const waitMs =
+      retryAfterMs && retryAfterMs > 0 ? Math.min(maxDelayMs, retryAfterMs) : backoff + jitter;
     await delay(waitMs);
   }
 
@@ -308,6 +310,7 @@ export async function getZulipEvents(
     queueId: string;
     lastEventId: number;
     timeoutMs?: number;
+    signal?: AbortSignal;
   },
 ): Promise<
   ZulipApiResponse & { events?: Array<{ id: number; type: string; message?: ZulipMessage }> }
@@ -318,6 +321,15 @@ export async function getZulipEvents(
     dont_block: "false",
   });
   const controller = new AbortController();
+  const externalSignal = params.signal;
+  // Chain external abort signal if provided
+  if (externalSignal?.aborted) {
+    controller.abort(externalSignal.reason);
+  } else {
+    externalSignal?.addEventListener("abort", () => controller.abort(externalSignal.reason), {
+      once: true,
+    });
+  }
   const timeoutMs = params.timeoutMs ?? 90000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs + 15000);
   try {
@@ -336,6 +348,7 @@ export async function getZulipEventsWithRetry(
     lastEventId: number;
     timeoutMs?: number;
     retryBaseDelayMs?: number;
+    signal?: AbortSignal;
   },
 ): Promise<
   ZulipApiResponse & { events?: Array<{ id: number; type: string; message?: ZulipMessage }> }
@@ -346,6 +359,15 @@ export async function getZulipEventsWithRetry(
     dont_block: "false",
   });
   const controller = new AbortController();
+  const externalSignal = params.signal;
+  // Chain external abort signal if provided
+  if (externalSignal?.aborted) {
+    controller.abort(externalSignal.reason);
+  } else {
+    externalSignal?.addEventListener("abort", () => controller.abort(externalSignal.reason), {
+      once: true,
+    });
+  }
   const timeoutMs = params.timeoutMs ?? 90000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs + 15000);
   try {

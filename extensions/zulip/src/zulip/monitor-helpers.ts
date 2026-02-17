@@ -1,6 +1,7 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import type WebSocket from "ws";
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 
 export type ResponsePrefixContext = {
   model?: string;
@@ -151,14 +152,19 @@ export function resolveIdentityName(cfg: OpenClawConfig, agentId: string): strin
 /**
  * Sanitizes a thread ID for safe use in session keys and file paths.
  * Replaces unsafe characters with hyphens to avoid path traversal and encoding issues.
+ * Falls back to a SHA-256 hash prefix if the result exceeds 200 characters.
  */
 function sanitizeThreadId(threadId: string): string {
-  return threadId
+  const sanitized = threadId
     .replace(/[/\\:*?"<>|]/g, "-") // Path-unsafe chars
     .replace(/\s+/g, "-") // Spaces → hyphens
     .replace(/-+/g, "-") // Collapse multiple hyphens
     .replace(/^-|-$/g, "") // Trim leading/trailing hyphens
     .toLowerCase();
+  if (sanitized.length > 200) {
+    return createHash("sha256").update(threadId).digest("hex").slice(0, 16);
+  }
+  return sanitized;
 }
 
 export function resolveThreadSessionKeys(params: {
