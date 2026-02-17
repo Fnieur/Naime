@@ -21,11 +21,30 @@ describe("telegram custom commands schema", () => {
     ]);
   });
 
+  it("normalizes hyphenated command names", () => {
+    const res = OpenClawSchema.safeParse({
+      channels: {
+        telegram: {
+          customCommands: [{ command: "my-command", description: "Hyphenated" }],
+        },
+      },
+    });
+
+    expect(res.success).toBe(true);
+    if (!res.success) {
+      return;
+    }
+
+    expect(res.data.channels?.telegram?.customCommands).toEqual([
+      { command: "my_command", description: "Hyphenated" },
+    ]);
+  });
+
   it("rejects custom commands with invalid names", () => {
     const res = OpenClawSchema.safeParse({
       channels: {
         telegram: {
-          customCommands: [{ command: "Bad-Name", description: "Override status" }],
+          customCommands: [{ command: "bad name!", description: "Override status" }],
         },
       },
     });
