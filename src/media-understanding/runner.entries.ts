@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { requireApiKey, resolveApiKeyForProvider } from "../agents/model-auth.js";
 import {
   collectProviderApiKeysForExecution,
   executeWithApiKeyRotation,
 } from "../agents/api-key-rotation.js";
+import { requireApiKey, resolveApiKeyForProvider } from "../agents/model-auth.js";
 import type { MsgContext } from "../auto-reply/templating.js";
 import { applyTemplate } from "../auto-reply/templating.js";
 import type { OpenClawConfig } from "../config/config.js";
