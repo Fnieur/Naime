@@ -94,19 +94,23 @@ export function resetBaileysMocks() {
 
   const makeWASocket = vi.mocked(baileys.makeWASocket);
   makeWASocket.mockReset();
-  makeWASocket.mockImplementation(recreated.mod.makeWASocket);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  makeWASocket.mockImplementation(recreated.mod.makeWASocket as any);
 
   const useMultiFileAuthState = vi.mocked(baileys.useMultiFileAuthState);
   useMultiFileAuthState.mockReset();
-  useMultiFileAuthState.mockImplementation(recreated.mod.useMultiFileAuthState);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  useMultiFileAuthState.mockImplementation(recreated.mod.useMultiFileAuthState as any);
 
   const fetchLatestBaileysVersion = vi.mocked(baileys.fetchLatestBaileysVersion);
   fetchLatestBaileysVersion.mockReset();
-  fetchLatestBaileysVersion.mockImplementation(recreated.mod.fetchLatestBaileysVersion);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fetchLatestBaileysVersion.mockImplementation(recreated.mod.fetchLatestBaileysVersion as any);
 
   const makeCacheableSignalKeyStore = vi.mocked(baileys.makeCacheableSignalKeyStore);
   makeCacheableSignalKeyStore.mockReset();
-  makeCacheableSignalKeyStore.mockImplementation(recreated.mod.makeCacheableSignalKeyStore);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  makeCacheableSignalKeyStore.mockImplementation(recreated.mod.makeCacheableSignalKeyStore as any);
 }
 
 export function getLastSocket(): MockBaileysSocket {
