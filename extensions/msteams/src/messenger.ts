@@ -447,23 +447,40 @@ export async function sendMSTeamsMessages(params: {
       throw new Error("Missing context for replyStyle=thread");
     }
     const messageIds: string[] = [];
-    for (const [idx, message] of messages.entries()) {
-      const response = await sendWithRetry(
-        async () =>
-          await ctx.sendActivity(
-            await buildActivity(
-              message,
-              params.conversationRef,
-              params.tokenProvider,
-              params.sharePointSiteId,
-              params.mediaMaxBytes,
+    try {
+      for (const [idx, message] of messages.entries()) {
+        const response = await sendWithRetry(
+          async () =>
+            await ctx.sendActivity(
+              await buildActivity(
+                message,
+                params.conversationRef,
+                params.tokenProvider,
+                params.sharePointSiteId,
+                params.mediaMaxBytes,
+              ),
             ),
-          ),
-        { messageIndex: idx, messageCount: messages.length },
+          { messageIndex: idx, messageCount: messages.length },
+        );
+        messageIds.push(extractMessageId(response) ?? "unknown");
+      }
+      return messageIds;
+    } catch (err) {
+      // The Bot Framework TurnContext proxy expires after ~15 seconds.
+      // When tool calls take longer, ctx.sendActivity fails with a
+      // "proxy that has been revoked" TypeError.  Fall back to proactive
+      // messaging which uses adapter.continueConversation and does not
+      // depend on the original request context.
+      const isProxyRevoked = err instanceof TypeError && /proxy.*revoked/i.test(err.message);
+      if (!isProxyRevoked) {
+        throw err;
+      }
+      const runtime = getMSTeamsRuntime();
+      runtime?.warn?.(
+        "Thread reply context expired (proxy revoked); falling back to proactive messaging",
       );
-      messageIds.push(extractMessageId(response) ?? "unknown");
+      // Fall through to the proactive messaging path below.
     }
-    return messageIds;
   }
 
   const baseRef = buildConversationReference(params.conversationRef);
