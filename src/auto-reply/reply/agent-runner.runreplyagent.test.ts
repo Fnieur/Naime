@@ -8,8 +8,10 @@ import type { TemplateContext } from "../templating.js";
 import type { GetReplyOptions } from "../types.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
 import * as sessions from "../../config/sessions.js";
-import { DEFAULT_MEMORY_FLUSH_PROMPT } from "./memory-flush.js";
+import * as memoryFlush from "./memory-flush.js";
 import { createMockTypingController } from "./test-helpers.js";
+
+const DEFAULT_PROMPT = memoryFlush.DEFAULT_MEMORY_FLUSH_PROMPT;
 
 type AgentRunParams = {
   onPartialReply?: (payload: { text?: string }) => Promise<void> | void;
@@ -949,7 +951,7 @@ describe("runReplyAgent memory flush", () => {
       const calls: Array<EmbeddedRunParams> = [];
       state.runEmbeddedPiAgentMock.mockImplementation(async (params: EmbeddedRunParams) => {
         calls.push(params);
-        if (params.prompt === DEFAULT_MEMORY_FLUSH_PROMPT) {
+        if (params.prompt === DEFAULT_PROMPT) {
           return { payloads: [], meta: {} };
         }
         return {
@@ -1009,7 +1011,7 @@ describe("runReplyAgent memory flush", () => {
       const calls: Array<{ prompt?: string }> = [];
       state.runEmbeddedPiAgentMock.mockImplementation(async (params: EmbeddedRunParams) => {
         calls.push({ prompt: params.prompt });
-        if (params.prompt === DEFAULT_MEMORY_FLUSH_PROMPT) {
+        if (params.prompt === DEFAULT_PROMPT) {
           return { payloads: [], meta: {} };
         }
         return {
@@ -1031,7 +1033,7 @@ describe("runReplyAgent memory flush", () => {
         commandBody: "hello",
       });
 
-      expect(calls.map((call) => call.prompt)).toEqual([DEFAULT_MEMORY_FLUSH_PROMPT, "hello"]);
+      expect(calls.map((call) => call.prompt)).toEqual([DEFAULT_PROMPT, "hello"]);
 
       const stored = JSON.parse(await fs.readFile(storePath, "utf-8"));
       expect(stored[sessionKey].memoryFlushAt).toBeTypeOf("number");
@@ -1065,7 +1067,7 @@ describe("runReplyAgent memory flush", () => {
       const calls: Array<{ prompt?: string }> = [];
       state.runEmbeddedPiAgentMock.mockImplementation(async (params: EmbeddedRunParams) => {
         calls.push({ prompt: params.prompt });
-        if (params.prompt === DEFAULT_MEMORY_FLUSH_PROMPT) {
+        if (params.prompt === DEFAULT_PROMPT) {
           return { payloads: [], meta: {} };
         }
         return {
@@ -1088,7 +1090,7 @@ describe("runReplyAgent memory flush", () => {
         commandBody: "hello",
       });
 
-      expect(calls.map((call) => call.prompt)).toEqual([DEFAULT_MEMORY_FLUSH_PROMPT, "hello"]);
+      expect(calls.map((call) => call.prompt)).toEqual([DEFAULT_PROMPT, "hello"]);
 
       const stored = JSON.parse(await fs.readFile(storePath, "utf-8"));
       expect(stored[sessionKey].memoryFlushAt).toBeTypeOf("number");
@@ -1197,7 +1199,7 @@ describe("runReplyAgent memory flush", () => {
       await seedSessionStore({ storePath, sessionKey, entry: sessionEntry });
 
       state.runEmbeddedPiAgentMock.mockImplementation(async (params: EmbeddedRunParams) => {
-        if (params.prompt === DEFAULT_MEMORY_FLUSH_PROMPT) {
+        if (params.prompt === DEFAULT_PROMPT) {
           params.onAgentEvent?.({
             stream: "compaction",
             data: { phase: "end", willRetry: false },
