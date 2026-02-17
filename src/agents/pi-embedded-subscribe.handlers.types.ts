@@ -162,6 +162,13 @@ export type ToolHandlerState = Pick<
   | "messagingToolSentMediaUrls"
   | "messagingToolSentTargets"
   | "successfulCronAdds"
+  | "unsubscribed"
+  | "toolExecutionCount"
+  | "toolExecutionInFlight"
+  | "activeToolName"
+  | "activeToolCallId"
+  | "activeToolStartTime"
+  | "toolStartData"
 >;
 
 export type ToolHandlerContext = {
