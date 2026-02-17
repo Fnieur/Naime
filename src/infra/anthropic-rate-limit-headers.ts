@@ -1,33 +1,10 @@
-/**
- * Utilities for extracting and monitoring Anthropic API rate limit headers.
- * Used by the subagent orchestration system to make dynamic spawn delay decisions.
- */
-
-export interface AnthropicRateLimitState {
-  requestsRemaining: number | null;
-  inputTokensRemaining: number | null;
-  outputTokensRemaining: number | null;
-  requestsReset: Date | null;
-  inputTokensReset: Date | null;
-  outputTokensReset: Date | null;
-  requestsLimit: number | null;
-  inputTokensLimit: number | null;
-  outputTokensLimit: number | null;
-}
-
-/**
- * Extract rate limit information from Anthropic API response headers.
- * Headers are rounded to nearest 1000 for input/output tokens.
- */
-export function extractAnthropicRateLimitState(
-  headers: Record<string, string>,
-): AnthropicRateLimitState {
+export function parseRateLimitHeaders(headers: Headers) {
   const parseNumber = (value: string | undefined): number | null => {
     if (!value) {
       return null;
     }
     const parsed = parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : null;
+    return Number.isNaN(parsed) ? null : parsed;
   };
 
   const parseDate = (value: string | undefined): Date | null => {
@@ -35,30 +12,25 @@ export function extractAnthropicRateLimitState(
       return null;
     }
     try {
-      return new Date(value);
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
     } catch {
       return null;
     }
   };
 
   return {
-    requestsRemaining: parseNumber(headers["anthropic-ratelimit-requests-remaining"]),
-    inputTokensRemaining: parseNumber(headers["anthropic-ratelimit-input-tokens-remaining"]),
-    outputTokensRemaining: parseNumber(headers["anthropic-ratelimit-output-tokens-remaining"]),
-    requestsReset: parseDate(headers["anthropic-ratelimit-requests-reset"]),
-    inputTokensReset: parseDate(headers["anthropic-ratelimit-input-tokens-reset"]),
-    outputTokensReset: parseDate(headers["anthropic-ratelimit-output-tokens-reset"]),
-    requestsLimit: parseNumber(headers["anthropic-ratelimit-requests-limit"]),
-    inputTokensLimit: parseNumber(headers["anthropic-ratelimit-input-tokens-limit"]),
-    outputTokensLimit: parseNumber(headers["anthropic-ratelimit-output-tokens-limit"]),
+    requestsLimit: parseNumber(headers.get("anthropic-ratelimit-requests-limit")),
+    requestsRemaining: parseNumber(headers.get("anthropic-ratelimit-requests-remaining")),
+    requestsReset: parseDate(headers.get("anthropic-ratelimit-requests-reset")),
+    tokensLimit: parseNumber(headers.get("anthropic-ratelimit-tokens-limit")),
+    tokensRemaining: parseNumber(headers.get("anthropic-ratelimit-tokens-remaining")),
+    tokensReset: parseDate(headers.get("anthropic-ratelimit-tokens-reset")),
+    retryAfter: parseNumber(headers.get("retry-after")),
   };
 }
 
-/**
- * Calculate the percentage of rate limit capacity consumed.
- * Returns null if either limit or remaining is unknown.
- */
-export function getCapacityPercentage(
+export function calculateCapacityPercentage(
   limit: number | null,
   remaining: number | null,
 ): number | null {
@@ -71,29 +43,25 @@ export function getCapacityPercentage(
   return (limit - remaining) / limit;
 }
 
-/**
- * Recommend a spawn delay based on current capacity consumption.
- * Conservative: scale from 2s (spare capacity) to 16s (near limit).
- *
- * @param capacityPercentage 0.0 (spare) to 1.0 (full)
- * @returns recommended delay in milliseconds
- */
-export function recommendSpawnDelayMs(capacityPercentage: number | null): number {
-  if (capacityPercentage === null) {
-    return 2000; // Default: 2s
-  }
-
-  // Clamp to valid range
-  const capped = Math.max(0, Math.min(1, capacityPercentage));
-
-  // Linear scaling: 2s at 0%, 16s at 100%
-  // Formula: 2000 + (capped * 14000)
-  return Math.round(2000 + capped * 14000);
+export interface RateLimitMetrics {
+  requestsCapacity: number | null;
+  tokensCapacity: number | null;
 }
 
-/**
- * Determine if we should warn about approaching rate limits.
- */
+export function getRateLimitMetrics(headers: Headers): RateLimitMetrics {
+  const parsed = parseRateLimitHeaders(headers);
+  return {
+    requestsCapacity: calculateCapacityPercentage(parsed.requestsLimit, parsed.requestsRemaining),
+    tokensCapacity: calculateCapacityPercentage(parsed.tokensLimit, parsed.tokensRemaining),
+  };
+}
+
+export interface RateLimitStatus {
+  isWarning: boolean;
+  isHaltNeeded: boolean;
+  metrics: RateLimitMetrics;
+}
+
 export function shouldWarnRateLimit(capacityPercentage: number | null, warnAt: number): boolean {
   if (capacityPercentage === null) {
     return false;
@@ -101,9 +69,6 @@ export function shouldWarnRateLimit(capacityPercentage: number | null, warnAt: n
   return capacityPercentage >= warnAt;
 }
 
-/**
- * Determine if we should halt spawning to avoid rate limit errors.
- */
 export function shouldHaltSpawning(capacityPercentage: number | null, haltAt: number): boolean {
   if (capacityPercentage === null) {
     return false;
@@ -111,29 +76,31 @@ export function shouldHaltSpawning(capacityPercentage: number | null, haltAt: nu
   return capacityPercentage >= haltAt;
 }
 
-/**
- * Calculate effective ITPM given cache hit rate.
- * With caching, only uncached tokens count toward ITPM.
- * Example: 1M ITPM raw + 80% cache hit = 5M effective (1M / 0.2).
- */
-export function calculateEffectiveITPM(rawITPM: number, estimatedCacheHitRate: number): number {
-  const uncachedPortion = Math.max(0.01, 1 - estimatedCacheHitRate);
-  return Math.round(rawITPM / uncachedPortion);
+export function analyzeRateLimits(
+  headers: Headers,
+  config: { warnAt: number; haltAt: number },
+): RateLimitStatus {
+  const metrics = getRateLimitMetrics(headers);
+  const isWarning =
+    shouldWarnRateLimit(metrics.requestsCapacity, config.warnAt) ||
+    shouldWarnRateLimit(metrics.tokensCapacity, config.warnAt);
+  const isHaltNeeded =
+    shouldHaltSpawning(metrics.requestsCapacity, config.haltAt) ||
+    shouldHaltSpawning(metrics.tokensCapacity, config.haltAt);
+
+  return { isWarning, isHaltNeeded, metrics };
 }
 
-/**
- * Estimate cost (input tokens) for a subagent spawn before execution.
- * Accounts for system prompt, context, and estimated cache behavior.
- */
-export function estimateSpawnCost(params: {
+export interface SpawnThrottleParams {
   systemPromptTokens: number;
   contextTokens: number;
-  estimatedCacheHitRate: number;
-}): number {
-  // Assume system prompt is in cache (high reuse), context varies
-  const cachedTokens = params.systemPromptTokens;
-  const uncachedTokens = params.contextTokens;
+  availableTokens: number | null;
+}
 
-  // Only uncached tokens count toward ITPM
-  return uncachedTokens;
+export function estimateSpawnImpact(params: SpawnThrottleParams): number | null {
+  if (params.availableTokens === null) {
+    return null;
+  }
+  const uncachedTokens = params.contextTokens;
+  return uncachedTokens / params.availableTokens;
 }

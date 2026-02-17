@@ -1,6 +1,6 @@
 import { RateLimitError } from "@buape/carbon";
 import { formatErrorMessage } from "./errors.js";
-import { type RetryConfig, resolveRetryConfig, retryAsync } from "./retry.js";
+import { resolveRetryConfig, retryAsync, type RetryConfig } from "./retry.js";
 
 export type RetryRunner = <T>(fn: () => Promise<T>, label?: string) => Promise<T>;
 
@@ -93,7 +93,9 @@ export function createTelegramRetryRunner(params: {
         ? (info) => {
             const maxRetries = Math.max(1, info.maxAttempts - 1);
             console.warn(
-              `telegram send retry ${info.attempt}/${maxRetries} for ${info.label ?? label ?? "request"} in ${info.delayMs}ms: ${formatErrorMessage(info.err)}`,
+              `telegram send retry ${info.attempt}/${maxRetries} for ${info.label ?? label ?? "request"} in ${
+                info.delayMs
+              }ms: ${formatErrorMessage(info.err)}`,
             );
           }
         : undefined,
