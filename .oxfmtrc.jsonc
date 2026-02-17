@@ -17,5 +17,6 @@
     "src/auto-reply/reply/export-html/",
     "Swabble/",
     "vendor/",
+    "src/agents/compaction.ts",
   ],
 }
