@@ -578,10 +578,19 @@ export async function runCronIsolatedAgentTurn(params: {
       }),
     );
 
+  // Skip delivery for "auto" mode when agent response is a short ack
+  const isAutoDeliver = params.job.payload.kind === "agentTurn" && params.job.payload.deliver === "auto";
+  const skipAutoDeliverAck = isAutoDeliver && (() => {
+    if (payloads.length === 0) return true;
+    const lastText = (payloads[payloads.length - 1]?.text ?? "").trim().toLowerCase().replace(/[^a-z0-9_\s]/g, "");
+    const ackPatterns = ["ok", "no_reply", "noreply", "no reply", "heartbeat_ok", "acknowledged", "ack", "noted", "done", "ignored"];
+    return ackPatterns.includes(lastText) || lastText.length <= 3;
+  })();
+
   // `true` means we confirmed at least one outbound send reached the target.
   // Keep this strict so timer fallback can safely decide whether to wake main.
   let delivered = skipMessagingToolDelivery;
-  if (deliveryRequested && !skipHeartbeatDelivery && !skipMessagingToolDelivery) {
+  if (deliveryRequested && !skipHeartbeatDelivery && !skipMessagingToolDelivery && !skipAutoDeliverAck) {
     if (resolvedDelivery.error) {
       if (!deliveryBestEffort) {
         return withRunSession({

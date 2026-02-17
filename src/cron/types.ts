@@ -31,7 +31,7 @@ export type CronPayload =
       thinking?: string;
       timeoutSeconds?: number;
       allowUnsafeExternalContent?: boolean;
-      deliver?: boolean;
+      deliver?: boolean | "auto";
       channel?: CronMessageChannel;
       to?: string;
       bestEffortDeliver?: boolean;
@@ -46,7 +46,7 @@ export type CronPayloadPatch =
       thinking?: string;
       timeoutSeconds?: number;
       allowUnsafeExternalContent?: boolean;
-      deliver?: boolean;
+      deliver?: boolean | "auto";
       channel?: CronMessageChannel;
       to?: string;
       bestEffortDeliver?: boolean;
