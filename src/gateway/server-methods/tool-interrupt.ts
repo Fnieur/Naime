@@ -37,6 +37,37 @@ export function createToolInterruptHandlers(manager: ToolInterruptManager): Gate
         twoPhase?: boolean;
       };
 
+      const snapshot = manager.getSnapshot(p.approvalRequestId);
+      if (snapshot?.resumedAtMs) {
+        if (
+          snapshot.runId !== p.runId ||
+          snapshot.sessionKey !== p.sessionKey ||
+          snapshot.toolCallId !== p.toolCallId
+        ) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "tool interrupt binding mismatch"),
+          );
+          return;
+        }
+        respond(
+          true,
+          {
+            status: "resumed",
+            approvalRequestId: snapshot.approvalRequestId,
+            runId: snapshot.runId,
+            sessionKey: snapshot.sessionKey,
+            toolCallId: snapshot.toolCallId,
+            resumedAtMs: snapshot.resumedAtMs,
+            resumedBy: snapshot.resumedBy ?? null,
+            result: snapshot.resumedResult,
+          },
+          undefined,
+        );
+        return;
+      }
+
       let emitted: Awaited<ReturnType<typeof manager.emit>>;
       try {
         emitted = await manager.emit({

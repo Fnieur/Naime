@@ -117,3 +117,89 @@ describe("tool interrupt handlers", () => {
     manager.stop();
   });
 });
+
+it("allows replayed emit calls to return already resumed payload", async () => {
+  const filePath = await createTempInterruptPath();
+  const manager = new ToolInterruptManager({ filePath });
+  await manager.load();
+  const handlers = createToolInterruptHandlers(manager);
+
+  const broadcasts: Array<{ event: string; payload: unknown }> = [];
+
+  const emitRespond = vi.fn();
+  const emitPromise = handlers["tool.interrupt.emit"](
+    baseHandlerArgs({
+      req: { id: "req-emit", type: "req", method: "tool.interrupt.emit" } as never,
+      params: {
+        approvalRequestId: "approval-replay-1",
+        runId: "run-replay-1",
+        sessionKey: "agent:main:main",
+        toolCallId: "tool-replay-1",
+        interrupt: { type: "approval", text: "approve this" },
+        timeoutMs: 60_000,
+      },
+      respond: emitRespond,
+      context: {
+        broadcast: (event: string, payload: unknown) => {
+          broadcasts.push({ event, payload });
+        },
+      } as unknown as GatewayRequestHandlerOptions["context"],
+    }),
+  );
+
+  await vi.waitFor(() => {
+    expect(broadcasts.some((entry) => entry.event === "tool.interrupt.requested")).toBe(true);
+  });
+
+  const requested = broadcasts.find((entry) => entry.event === "tool.interrupt.requested");
+  const requestedPayload = (requested?.payload ?? {}) as {
+    resumeToken?: string;
+  };
+
+  const resumeRespond = vi.fn();
+  await handlers["tool.interrupt.resume"](
+    baseHandlerArgs({
+      req: { id: "req-resume", type: "req", method: "tool.interrupt.resume" } as never,
+      params: {
+        approvalRequestId: "approval-replay-1",
+        runId: "run-replay-1",
+        sessionKey: "agent:main:main",
+        toolCallId: "tool-replay-1",
+        resumeToken: requestedPayload.resumeToken,
+        result: { ok: true, note: "done" },
+      },
+      respond: resumeRespond,
+    }),
+  );
+
+  await emitPromise;
+
+  const replayRespond = vi.fn();
+  await handlers["tool.interrupt.emit"](
+    baseHandlerArgs({
+      req: { id: "req-replay", type: "req", method: "tool.interrupt.emit" } as never,
+      params: {
+        approvalRequestId: "approval-replay-1",
+        runId: "run-replay-1",
+        sessionKey: "agent:main:main",
+        toolCallId: "tool-replay-1",
+        interrupt: { type: "approval", text: "approve this" },
+        timeoutMs: 60_000,
+      },
+      respond: replayRespond,
+    }),
+  );
+
+  expect(replayRespond).toHaveBeenCalled();
+  expect(replayRespond.mock.calls[0]?.[0]).toBe(true);
+  expect(replayRespond.mock.calls[0]?.[1]).toMatchObject({
+    status: "resumed",
+    approvalRequestId: "approval-replay-1",
+    runId: "run-replay-1",
+    sessionKey: "agent:main:main",
+    toolCallId: "tool-replay-1",
+    result: { ok: true, note: "done" },
+  });
+
+  manager.stop();
+});

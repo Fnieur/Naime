@@ -4,7 +4,7 @@ import { resolveStateDir } from "../config/paths.js";
 import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../infra/json-files.js";
 import { safeEqualSecret } from "../security/secret-equal.js";
 
-const TOOL_INTERRUPTS_FILE_VERSION = 1;
+const TOOL_INTERRUPTS_FILE_VERSION = 2;
 const DEFAULT_INTERRUPT_TIMEOUT_MS = 10 * 60 * 1000;
 const MIN_INTERRUPT_TIMEOUT_MS = 1_000;
 const MAX_INTERRUPT_TIMEOUT_MS = 24 * 60 * 60 * 1000;
@@ -26,6 +26,7 @@ type StoredToolInterruptRecord = ToolInterruptBinding & {
   resumeTokenHash: string;
   resumedAtMs?: number;
   resumedBy?: string | null;
+  resumedResult?: unknown;
   expiredAtMs?: number;
 };
 
@@ -154,6 +155,8 @@ function parseStoredRecord(value: unknown): StoredToolInterruptRecord | null {
       ? record.expiredAtMs
       : undefined;
 
+  const resumedResult = (record as { resumedResult?: unknown }).resumedResult;
+
   return {
     approvalRequestId: record.approvalRequestId.trim(),
     runId: record.runId.trim(),
@@ -168,6 +171,7 @@ function parseStoredRecord(value: unknown): StoredToolInterruptRecord | null {
       typeof record.resumedBy === "string" || record.resumedBy === null
         ? record.resumedBy
         : undefined,
+    resumedResult,
     expiredAtMs: expiredAtMs ? Math.floor(expiredAtMs) : undefined,
   };
 }
@@ -253,6 +257,7 @@ export class ToolInterruptManager {
       expiresAtMs: record.expiresAtMs,
       resumedAtMs: record.resumedAtMs,
       resumedBy: record.resumedBy,
+      resumedResult: record.resumedResult,
       expiredAtMs: record.expiredAtMs,
     };
   }
@@ -441,6 +446,7 @@ export class ToolInterruptManager {
       };
       record.resumedAtMs = resumedAtMs;
       record.resumedBy = params.resumedBy ?? null;
+      record.resumedResult = params.result;
       this.settlePendingLocked(binding.approvalRequestId, waitResult);
       this.pruneRecordsLocked(now);
       await this.persistLocked();
@@ -573,6 +579,7 @@ export class ToolInterruptManager {
         resumeTokenHash: record.resumeTokenHash,
         resumedAtMs: record.resumedAtMs,
         resumedBy: record.resumedBy,
+        resumedResult: record.resumedResult,
         expiredAtMs: record.expiredAtMs,
       };
     }
