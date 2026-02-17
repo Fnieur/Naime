@@ -108,6 +108,7 @@ export const CLAUDE_PARAM_GROUPS = {
     {
       keys: ["newText", "new_string"],
       label: "newText (newText or new_string)",
+      allowEmpty: true,
     },
   ],
 } as const;
