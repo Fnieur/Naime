@@ -62,6 +62,7 @@ import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
 import { GATEWAY_EVENTS, listGatewayMethods } from "./server-methods-list.js";
 import { coreGatewayHandlers } from "./server-methods.js";
 import { createExecApprovalHandlers } from "./server-methods/exec-approval.js";
+import { createToolInterruptHandlers } from "./server-methods/tool-interrupt.js";
 import { safeParseJson } from "./server-methods/nodes.helpers.js";
 import { hasConnectedMobileNode } from "./server-mobile-nodes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
@@ -76,6 +77,7 @@ import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
+import { ToolInterruptManager } from "./tool-interrupt-manager.js";
 import {
   getHealthCache,
   getHealthVersion,
@@ -535,6 +537,9 @@ export async function startGatewayServer(
   const execApprovalHandlers = createExecApprovalHandlers(execApprovalManager, {
     forwarder: execApprovalForwarder,
   });
+  const toolInterruptManager = new ToolInterruptManager();
+  await toolInterruptManager.load();
+  const toolInterruptHandlers = createToolInterruptHandlers(toolInterruptManager);
 
   const canvasHostServerPort = (canvasHostServer as CanvasHostServer | null)?.port;
 
@@ -555,6 +560,7 @@ export async function startGatewayServer(
     extraHandlers: {
       ...pluginRegistry.gatewayHandlers,
       ...execApprovalHandlers,
+      ...toolInterruptHandlers,
     },
     broadcast,
     context: {
@@ -562,6 +568,7 @@ export async function startGatewayServer(
       cron,
       cronStorePath,
       execApprovalManager,
+      toolInterruptManager,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
@@ -729,6 +736,8 @@ export async function startGatewayServer(
         skillsRefreshTimer = null;
       }
       skillsChangeUnsub();
+      execApprovalForwarder.stop();
+      toolInterruptManager.stop();
       authRateLimiter?.dispose();
       channelHealthMonitor?.stop();
       await close(opts);
