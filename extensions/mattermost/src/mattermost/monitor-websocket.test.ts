@@ -185,6 +185,7 @@ describe("mattermost websocket monitor", () => {
       webSocketFactory: () => socket,
     });
 
+    const connected = connectOnce();
     queueMicrotask(() => {
       socket.emitOpen();
       socket.emitMessage(
@@ -204,7 +205,7 @@ describe("mattermost websocket monitor", () => {
       socket.emitClose(1000);
     });
 
-    await expect(connectOnce()).resolves.toBeUndefined();
+    await connected;
 
     expect(onReaction).toHaveBeenCalledTimes(1);
     expect(onPosted).not.toHaveBeenCalled();
