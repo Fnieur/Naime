@@ -113,6 +113,10 @@ export class OpenClawApp extends LitElement {
       void i18n.setLocale(this.settings.locale);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Core / Connection state
+  // ---------------------------------------------------------------------------
   @state() password = "";
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
@@ -126,10 +130,16 @@ export class OpenClawApp extends LitElement {
   private toolStreamSyncTimer: number | null = null;
   private sidebarCloseTimer: number | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Assistant identity
+  // ---------------------------------------------------------------------------
   @state() assistantName = bootAssistantIdentity.name;
   @state() assistantAvatar = bootAssistantIdentity.avatar;
   @state() assistantAgentId = bootAssistantIdentity.agentId ?? null;
 
+  // ---------------------------------------------------------------------------
+  // Chat state
+  // ---------------------------------------------------------------------------
   @state() sessionKey = this.settings.sessionKey;
   @state() chatLoading = false;
   @state() chatSending = false;
@@ -151,6 +161,9 @@ export class OpenClawApp extends LitElement {
   @state() sidebarError: string | null = null;
   @state() splitRatio = this.settings.splitRatio;
 
+  // ---------------------------------------------------------------------------
+  // Nodes & Devices state
+  // ---------------------------------------------------------------------------
   @state() nodesLoading = false;
   @state() nodes: Array<Record<string, unknown>> = [];
   @state() devicesLoading = false;
@@ -169,6 +182,9 @@ export class OpenClawApp extends LitElement {
   @state() execApprovalError: string | null = null;
   @state() pendingGatewayUrl: string | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Configuration state
+  // ---------------------------------------------------------------------------
   @state() configLoading = false;
   @state() configRaw = "{\n}\n";
   @state() configRawOriginal = "";
@@ -191,6 +207,9 @@ export class OpenClawApp extends LitElement {
   @state() configActiveSection: string | null = null;
   @state() configActiveSubsection: string | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Channels state (WhatsApp, Nostr, etc.)
+  // ---------------------------------------------------------------------------
   @state() channelsLoading = false;
   @state() channelsSnapshot: ChannelsStatusSnapshot | null = null;
   @state() channelsError: string | null = null;
@@ -202,11 +221,17 @@ export class OpenClawApp extends LitElement {
   @state() nostrProfileFormState: NostrProfileFormState | null = null;
   @state() nostrProfileAccountId: string | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Presence state
+  // ---------------------------------------------------------------------------
   @state() presenceLoading = false;
   @state() presenceEntries: PresenceEntry[] = [];
   @state() presenceError: string | null = null;
   @state() presenceStatus: string | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Agents state
+  // ---------------------------------------------------------------------------
   @state() agentsLoading = false;
   @state() agentsList: AgentsListResult | null = null;
   @state() agentsError: string | null = null;
@@ -228,6 +253,9 @@ export class OpenClawApp extends LitElement {
   @state() agentSkillsReport: SkillStatusReport | null = null;
   @state() agentSkillsAgentId: string | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Sessions state
+  // ---------------------------------------------------------------------------
   @state() sessionsLoading = false;
   @state() sessionsResult: SessionsListResult | null = null;
   @state() sessionsError: string | null = null;
@@ -236,6 +264,9 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
 
+  // ---------------------------------------------------------------------------
+  // Usage / Analytics state
+  // ---------------------------------------------------------------------------
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;
   @state() usageCostSummary: import("./types.js").CostUsageSummary | null = null;
@@ -291,6 +322,9 @@ export class OpenClawApp extends LitElement {
   // Non-reactive (don’t trigger renders just for timer bookkeeping).
   usageQueryDebounceTimer: number | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Cron state
+  // ---------------------------------------------------------------------------
   @state() cronLoading = false;
   @state() cronJobs: CronJob[] = [];
   @state() cronStatus: CronStatus | null = null;
@@ -300,6 +334,9 @@ export class OpenClawApp extends LitElement {
   @state() cronRuns: CronRunLogEntry[] = [];
   @state() cronBusy = false;
 
+  // ---------------------------------------------------------------------------
+  // Skills state
+  // ---------------------------------------------------------------------------
   @state() skillsLoading = false;
   @state() skillsReport: SkillStatusReport | null = null;
   @state() skillsError: string | null = null;
@@ -308,6 +345,9 @@ export class OpenClawApp extends LitElement {
   @state() skillsBusyKey: string | null = null;
   @state() skillMessages: Record<string, SkillMessage> = {};
 
+  // ---------------------------------------------------------------------------
+  // Debug state
+  // ---------------------------------------------------------------------------
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
   @state() debugHealth: HealthSnapshot | null = null;
@@ -318,6 +358,9 @@ export class OpenClawApp extends LitElement {
   @state() debugCallResult: string | null = null;
   @state() debugCallError: string | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Logs state
+  // ---------------------------------------------------------------------------
   @state() logsLoading = false;
   @state() logsError: string | null = null;
   @state() logsFile: string | null = null;
@@ -334,6 +377,9 @@ export class OpenClawApp extends LitElement {
   @state() logsMaxBytes = 250_000;
   @state() logsAtBottom = true;
 
+  // ---------------------------------------------------------------------------
+  // Internal / non-reactive state
+  // ---------------------------------------------------------------------------
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;
   private chatScrollTimeout: number | null = null;
@@ -354,6 +400,9 @@ export class OpenClawApp extends LitElement {
   private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
 
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
   createRenderRoot() {
     return this;
   }
@@ -376,6 +425,9 @@ export class OpenClawApp extends LitElement {
     handleUpdated(this as unknown as Parameters<typeof handleUpdated>[0], changed);
   }
 
+  // ---------------------------------------------------------------------------
+  // Public methods (delegated to external modules)
+  // ---------------------------------------------------------------------------
   connect() {
     connectGatewayInternal(this as unknown as Parameters<typeof connectGatewayInternal>[0]);
   }
