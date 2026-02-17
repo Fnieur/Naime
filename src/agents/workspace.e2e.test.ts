@@ -105,9 +105,9 @@ describe("ensureAgentWorkspace", () => {
 
     await ensureAgentWorkspace({ dir: tempDir, ensureBootstrapFiles: true });
 
-    await expect(
-      fs.access(path.join(tempDir, DEFAULT_HEARTBEAT_FILENAME)),
-    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.access(path.join(tempDir, DEFAULT_HEARTBEAT_FILENAME))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("does not re-seed BOOTSTRAP.md for legacy completed workspaces without state marker", async () => {
