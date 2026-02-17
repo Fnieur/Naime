@@ -146,7 +146,7 @@ async function callGatewayWithRetry(opts: Parameters<typeof callGateway>[0]): Pr
       const msg = lastError.message;
       const isRetryable =
         /timeout|timed out|etimedout/i.test(msg) ||
-        /gateway closed|abnormal closure|econnreset|socket hang up/i.test(msg);
+        /gateway closed(?! \(1000)|abnormal closure|econnreset|socket hang up/i.test(msg);
       if (!isRetryable) {
         // Non-retryable error — surface immediately.
         throw lastError;
