@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "../agents/model-auth.js";
-import { type FetchMock, withFetchPreconnect } from "../test-utils/fetch-mock.js";
+import { withFetchPreconnect } from "../test-utils/fetch-mock.js";
 import { createVoyageEmbeddingProvider, normalizeVoyageModel } from "./embeddings-voyage.js";
 
 vi.mock("../agents/model-auth.js", () => ({
@@ -13,14 +13,22 @@ vi.mock("../agents/model-auth.js", () => ({
   },
 }));
 
-const createFetchMock = () => {
-  const fetchMock = vi.fn<FetchMock>(
-    async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(JSON.stringify({ data: [{ embedding: [0.1, 0.2, 0.3] }] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+type FetchMock = ReturnType<
+  typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>
+>;
+
+const embeddingResponse = (embeddings: number[][]): Response =>
+  new Response(
+    JSON.stringify({
+      data: embeddings.map((embedding) => ({ embedding })),
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
   );
+
+const createFetchMock = () => {
+  const fetchMock: FetchMock = vi.fn<
+    (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  >(async () => embeddingResponse([[0.1, 0.2, 0.3]]));
   return withFetchPreconnect(fetchMock);
 };
 
@@ -53,9 +61,7 @@ describe("voyage embedding provider", () => {
       expect.objectContaining({ provider: "voyage" }),
     );
 
-    const call = fetchMock.mock.calls[0];
-    expect(call).toBeDefined();
-    const [url, init] = call as [RequestInfo | URL, RequestInit | undefined];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://api.voyageai.com/v1/embeddings");
 
     const headers = (init?.headers ?? {}) as Record<string, string>;
@@ -88,9 +94,7 @@ describe("voyage embedding provider", () => {
 
     await result.provider.embedQuery("test");
 
-    const call = fetchMock.mock.calls[0];
-    expect(call).toBeDefined();
-    const [url, init] = call as [RequestInfo | URL, RequestInit | undefined];
+    const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://proxy.example.com/embeddings");
 
     const headers = (init?.headers ?? {}) as Record<string, string>;
@@ -100,14 +104,11 @@ describe("voyage embedding provider", () => {
 
   it("passes input_type=document for embedBatch", async () => {
     const fetchMock = withFetchPreconnect(
-      vi.fn<FetchMock>(
-        async (_input: RequestInfo | URL, _init?: RequestInit) =>
-          new Response(
-            JSON.stringify({
-              data: [{ embedding: [0.1, 0.2] }, { embedding: [0.3, 0.4] }],
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
+      vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () =>
+        embeddingResponse([
+          [0.1, 0.2],
+          [0.3, 0.4],
+        ]),
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -127,9 +128,7 @@ describe("voyage embedding provider", () => {
 
     await result.provider.embedBatch(["doc1", "doc2"]);
 
-    const call = fetchMock.mock.calls[0];
-    expect(call).toBeDefined();
-    const [, init] = call as [RequestInfo | URL, RequestInit | undefined];
+    const [, init] = fetchMock.mock.calls[0];
     const body = JSON.parse(init?.body as string);
     expect(body).toEqual({
       model: "voyage-4-large",

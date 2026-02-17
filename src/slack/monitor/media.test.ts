@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ssrf from "../../infra/net/ssrf.js";
 import type { SavedMedia } from "../../media/store.js";
 import * as mediaStore from "../../media/store.js";
-import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
+import { withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 import {
   fetchWithSlackAuth,
   resolveSlackAttachmentContent,
@@ -12,7 +12,10 @@ import {
 
 // Store original fetch
 const originalFetch = globalThis.fetch;
-let mockFetch: ReturnType<typeof vi.fn<FetchMock>>;
+type FetchMock = ReturnType<
+  typeof vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>
+>;
+let mockFetch: FetchMock;
 const createSavedMedia = (filePath: string, contentType: string): SavedMedia => ({
   id: "saved-media-id",
   path: filePath,
@@ -20,12 +23,20 @@ const createSavedMedia = (filePath: string, contentType: string): SavedMedia => 
   contentType,
 });
 
+const requestUrl = (input: RequestInfo | URL): string => {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (input instanceof URL) {
+    return input.toString();
+  }
+  return input.url;
+};
+
 describe("fetchWithSlackAuth", () => {
   beforeEach(() => {
     // Create a new mock for each test
-    mockFetch = vi.fn<FetchMock>(
-      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(),
-    );
+    mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
     globalThis.fetch = withFetchPreconnect(mockFetch);
   });
 
@@ -171,7 +182,7 @@ describe("fetchWithSlackAuth", () => {
 
 describe("resolveSlackMedia", () => {
   beforeEach(() => {
-    mockFetch = vi.fn();
+    mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
     globalThis.fetch = withFetchPreconnect(mockFetch);
     vi.spyOn(ssrf, "resolvePinnedHostname").mockImplementation(async (hostname) => {
       const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
@@ -368,9 +379,8 @@ describe("resolveSlackMedia", () => {
       return createSavedMedia("/tmp/unknown", "application/octet-stream");
     });
 
-    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    mockFetch.mockImplementation(async (input) => {
+      const url = requestUrl(input);
       if (url.includes("/a.jpg")) {
         return new Response(Buffer.from("image a"), {
           status: 200,
@@ -435,7 +445,7 @@ describe("resolveSlackMedia", () => {
 
 describe("resolveSlackAttachmentContent", () => {
   beforeEach(() => {
-    mockFetch = vi.fn();
+    mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
     globalThis.fetch = withFetchPreconnect(mockFetch);
     vi.spyOn(ssrf, "resolvePinnedHostnameWithPolicy").mockImplementation(async (hostname) => {
       const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
