@@ -750,6 +750,7 @@ export function createWebSearchTool(options?: {
       const country = readStringParam(params, "country");
       const search_lang = readStringParam(params, "search_lang");
       const ui_lang = readStringParam(params, "ui_lang");
+      const modelOverride = readStringParam(params, "model");
       const rawFreshness = readStringParam(params, "freshness");
       if (rawFreshness && provider !== "brave" && provider !== "perplexity") {
         return jsonResult({
@@ -783,8 +784,8 @@ export function createWebSearchTool(options?: {
           perplexityAuth?.source,
           perplexityAuth?.apiKey,
         ),
-        perplexityModel: resolvePerplexityModel(perplexityConfig),
-        grokModel: resolveGrokModel(grokConfig),
+        perplexityModel: modelOverride ?? resolvePerplexityModel(perplexityConfig),
+        grokModel: modelOverride ?? resolveGrokModel(grokConfig),
         grokInlineCitations: resolveGrokInlineCitations(grokConfig),
       });
       return jsonResult(result);
