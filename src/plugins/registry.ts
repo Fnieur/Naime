@@ -2,6 +2,7 @@ import path from "node:path";
 import type { AnyAgentTool } from "../agents/tools/common.js";
 import type { ChannelDock } from "../channels/dock.js";
 import type { ChannelPlugin } from "../channels/plugins/types.js";
+import { loadConfig, writeConfigFile } from "../config/io.js";
 import type {
   GatewayRequestHandler,
   GatewayRequestHandlers,
@@ -34,7 +35,6 @@ import type {
   PluginHookRegistration as TypedPluginHookRegistration,
   StreamFnWrapperFn,
 } from "./types.js";
-import { loadConfig, writeConfigFile } from "../config/io.js";
 
 export type PluginToolRegistration = {
   pluginId: string;
@@ -480,10 +480,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     });
   };
 
-  const updatePluginConfig = async (
-    record: PluginRecord,
-    newConfig: Record<string, unknown>,
-  ) => {
+  const updatePluginConfig = async (record: PluginRecord, newConfig: Record<string, unknown>) => {
     // Read fresh config to avoid overwriting concurrent changes
     const currentConfig = loadConfig();
     const updated = {
@@ -502,10 +499,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     await writeConfigFile(updated);
   };
 
-  const updatePluginEnabled = async (
-    record: PluginRecord,
-    enabled: boolean,
-  ) => {
+  const updatePluginEnabled = async (record: PluginRecord, enabled: boolean) => {
     // Read fresh config to avoid overwriting concurrent changes
     const currentConfig = loadConfig();
     const updated = {
