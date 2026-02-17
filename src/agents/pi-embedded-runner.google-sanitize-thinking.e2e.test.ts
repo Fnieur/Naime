@@ -342,7 +342,7 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
   it("strips unsigned thinking blocks from accumulated tool-call context", () => {
     // Simulates the context that accumulates during an agent loop:
     // user turn → assistant with unsigned thinking + tool call → tool result → assistant again
-    const messages: AgentMessage[] = [
+    const messages = [
       { role: "user", content: "read /tmp/file and summarize" },
       {
         role: "assistant",
@@ -359,7 +359,7 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
       },
     ];
 
-    const out = sanitizeAntigravityThinkingBlocks(messages);
+    const out = sanitizeAntigravityThinkingBlocks(messages as AgentMessage[]);
 
     // Unsigned thinking block should be stripped; toolCall preserved.
     const assistant = out.find((m) => m.role === "assistant") as {
@@ -371,7 +371,7 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
   });
 
   it("preserves signed thinking blocks in accumulated context", () => {
-    const messages: AgentMessage[] = [
+    const messages = [
       { role: "user", content: "hello" },
       {
         role: "assistant",
@@ -382,14 +382,14 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
       },
     ];
 
-    const out = sanitizeAntigravityThinkingBlocks(messages);
+    const out = sanitizeAntigravityThinkingBlocks(messages as AgentMessage[]);
 
     // Should be unchanged (same reference).
     expect(out).toBe(messages);
   });
 
   it("normalizes signature field variants to thinkingSignature", () => {
-    const messages: AgentMessage[] = [
+    const messages = [
       { role: "user", content: "hi" },
       {
         role: "assistant",
@@ -397,7 +397,7 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
       },
     ];
 
-    const out = sanitizeAntigravityThinkingBlocks(messages);
+    const out = sanitizeAntigravityThinkingBlocks(messages as AgentMessage[]);
 
     const assistant = out.find((m) => m.role === "assistant") as {
       content?: Array<{ type?: string; thinkingSignature?: string; signature?: string }>;
@@ -406,7 +406,7 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
   });
 
   it("drops assistant messages entirely when only content is unsigned thinking", () => {
-    const messages: AgentMessage[] = [
+    const messages = [
       { role: "user", content: "hi" },
       {
         role: "assistant",
@@ -415,7 +415,7 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
       { role: "user", content: "hello again" },
     ];
 
-    const out = sanitizeAntigravityThinkingBlocks(messages);
+    const out = sanitizeAntigravityThinkingBlocks(messages as AgentMessage[]);
 
     // The all-unsigned assistant message should be dropped entirely.
     expect(out.filter((m) => m.role === "assistant")).toHaveLength(0);
@@ -423,12 +423,12 @@ describe("sanitizeAntigravityThinkingBlocks (transformContext path)", () => {
   });
 
   it("returns same array reference when no changes needed", () => {
-    const messages: AgentMessage[] = [
+    const messages = [
       { role: "user", content: "hi" },
       { role: "assistant", content: [{ type: "text", text: "hello" }] },
     ];
 
-    const out = sanitizeAntigravityThinkingBlocks(messages);
+    const out = sanitizeAntigravityThinkingBlocks(messages as AgentMessage[]);
 
     expect(out).toBe(messages);
   });
