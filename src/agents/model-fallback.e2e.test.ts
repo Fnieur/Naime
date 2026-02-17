@@ -112,6 +112,14 @@ describe("runWithModelFallback", () => {
     });
   });
 
+  it("falls back on insufficient_quota billing errors", async () => {
+    await expectFallsBackToHaiku({
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      firstError: new Error("Error: insufficient_quota"),
+    });
+  });
+
   it("falls back on credential validation errors", async () => {
     await expectFallsBackToHaiku({
       provider: "anthropic",
@@ -136,7 +144,7 @@ describe("runWithModelFallback", () => {
       },
       usageStats: {
         [profileId]: {
-          cooldownUntil: Date.now() + 60_000,
+          cooldownUntil: Date.now() + 10 * 60_000,
         },
       },
     };
