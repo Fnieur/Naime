@@ -3,6 +3,7 @@ import type { SimpleStreamOptions } from "@mariozechner/pi-ai";
 import { streamSimple } from "@mariozechner/pi-ai";
 import type { OpenClawConfig } from "../../config/config.js";
 import { log } from "./logger.js";
+import { createOpenRouterPromptCacheWrapper } from "./openrouter-prompt-cache.js";
 
 const OPENROUTER_APP_HEADERS: Record<string, string> = {
   "HTTP-Referer": "https://openclaw.ai",
@@ -240,6 +241,12 @@ export function applyExtraParamsToAgent(
   if (provider === "openrouter") {
     log.debug(`applying OpenRouter app attribution headers for ${provider}/${modelId}`);
     agent.streamFn = createOpenRouterHeadersWrapper(agent.streamFn);
+
+    // Apply OpenRouter prompt caching for supported models
+    const cachingWrapper = createOpenRouterPromptCacheWrapper(agent.streamFn, provider, modelId);
+    if (cachingWrapper) {
+      agent.streamFn = cachingWrapper;
+    }
   }
 
   // Enable Z.AI tool_stream for real-time tool call streaming.
