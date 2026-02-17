@@ -1,7 +1,7 @@
+import type { AssistantMessage } from "@mariozechner/pi-ai";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import type { EmbeddedRunAttemptResult } from "./pi-embedded-runner/run/types.js";
@@ -381,11 +381,7 @@ describe("runEmbeddedPiAgent auth profile rotation", () => {
       expect(runEmbeddedAttemptMock).toHaveBeenCalledTimes(1);
       expect(result.meta.aborted).toBe(true);
 
-      const stored = JSON.parse(
-        await fs.readFile(path.join(agentDir, "auth-profiles.json"), "utf-8"),
-      ) as { usageStats?: Record<string, { lastUsed?: number }> };
-      // p2 should NOT have been advanced to
-      expect(stored.usageStats?.["openai:p2"]?.lastUsed).toBe(2);
+      await expectProfileP2UsageUnchanged(agentDir);
     } finally {
       await fs.rm(agentDir, { recursive: true, force: true });
       await fs.rm(workspaceDir, { recursive: true, force: true });
