@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { OpenClawConfig } from "../../config/config.js";
 import {
   resolveMemoryFlushPromptForRun,
   resolvePeriodicExtractionSettings,
@@ -14,7 +15,7 @@ describe("resolveMemoryFlushPromptForRun", () => {
         timeFormat: "12",
       },
     },
-  };
+  } as OpenClawConfig;
 
   it("replaces YYYY-MM-DD using user timezone and appends current time", () => {
     const prompt = resolveMemoryFlushPromptForRun({
