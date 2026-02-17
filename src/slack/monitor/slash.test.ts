@@ -90,6 +90,8 @@ vi.mock("../../auto-reply/commands-registry.js", () => {
     resolveCommandArgMenu: (params: {
       command?: { key?: string };
       args?: { values?: unknown };
+      provider?: string;
+      model?: string;
     }) => {
       if (params.command?.key === "report") {
         const values = (params.args?.values ?? {}) as Record<string, unknown>;
