@@ -271,6 +271,20 @@ describe("buildEmbeddedRunPayloads", () => {
     expect(payloads[0]?.text).toContain("required");
   });
 
+  it("suppresses recoverable message react input errors", () => {
+    const payloads = buildPayloads({
+      lastToolError: {
+        toolName: "message",
+        meta: "react · to=group:123",
+        error: "messageId required",
+        mutatingAction: true,
+        actionFingerprint: "tool=message|action=react|to=group:123",
+      },
+    });
+
+    expect(payloads).toHaveLength(0);
+  });
+
   it("shows mutating tool errors even when assistant output exists", () => {
     const payloads = buildPayloads({
       assistantTexts: ["Done."],
