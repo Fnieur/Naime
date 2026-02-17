@@ -23,6 +23,7 @@ Docs: https://docs.openclaw.ai
 - Docker: add optional `OPENCLAW_INSTALL_BROWSER` build arg to preinstall Chromium + Xvfb in the Docker image, avoiding runtime Playwright installs. (#18449)
 - Agents/Z.AI: enable `tool_stream` by default for real-time tool call streaming, with opt-out via `params.tool_stream: false`. (#18173) Thanks @tianxiao1430-jpg.
 - Auto-reply: include `sender_id` in trusted inbound metadata so moderation workflows can target the sender without relying on untrusted text. (#18303) Thanks @crimeacs.
+- Web Search: raise the maximum results limit (`MAX_SEARCH_COUNT`) from 10 to 20 to align with Brave Search's native pagination capacity, and update associated documentation and UI hints. (#19379) Thanks @liyishuai.
 
 ### Fixes
 
