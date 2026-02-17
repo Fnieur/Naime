@@ -45,9 +45,7 @@ function buildContextPruningExtension(params: {
   agentId?: string;
 }): { additionalExtensionPaths?: string[] } {
   // Resolve full context pruning config (per-agent merged with defaults).
-  const resolved = params.cfg
-    ? resolveAgentContextPruning(params.cfg, params.agentId)
-    : undefined;
+  const resolved = params.cfg ? resolveAgentContextPruning(params.cfg, params.agentId) : undefined;
   if (resolved?.mode !== "cache-ttl") {
     return {};
   }

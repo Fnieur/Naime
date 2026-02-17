@@ -1,7 +1,10 @@
 import path from "node:path";
 import type { OpenClawConfig } from "../config/config.js";
-import type { AgentCompactionConfig, AgentContextPruningConfig } from "../config/types.agent-defaults.js";
 import { resolveStateDir } from "../config/paths.js";
+import type {
+  AgentCompactionConfig,
+  AgentContextPruningConfig,
+} from "../config/types.agent-defaults.js";
 import {
   DEFAULT_AGENT_ID,
   normalizeAgentId,
