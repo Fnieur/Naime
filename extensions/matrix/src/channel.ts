@@ -9,7 +9,7 @@ import {
   setAccountEnabledInConfigSection,
   type ChannelPlugin,
 } from "openclaw/plugin-sdk";
-import type { CoreConfig } from "./types.js";
+import type { CoreConfig, MatrixConfig } from "./types.js";
 import { matrixMessageActions } from "./actions.js";
 import { MatrixConfigSchema } from "./config-schema.js";
 import { listMatrixDirectoryGroupsLive, listMatrixDirectoryPeersLive } from "./directory-live.js";
@@ -19,7 +19,8 @@ import {
 } from "./group-mentions.js";
 import {
   listMatrixAccountIds,
-  resolveMatrixAccountConfig,
+  mergeAccountConfig,
+  resolveAccountConfig,
   resolveDefaultMatrixAccountId,
   resolveMatrixAccount,
   type ResolvedMatrixAccount,
@@ -31,6 +32,14 @@ import { sendMessageMatrix } from "./matrix/send.js";
 import { matrixOnboardingAdapter } from "./onboarding.js";
 import { matrixOutbound } from "./outbound.js";
 import { resolveMatrixTargets } from "./resolve-targets.js";
+
+/** Resolve merged config for a specific account, using shared account-lookup + merge. */
+function resolveMatrixAccountConfig(cfg: CoreConfig, accountId?: string | null): MatrixConfig {
+  const normalized = normalizeAccountId(accountId);
+  const matrixBase = cfg.channels?.matrix ?? {};
+  const accountConfig = resolveAccountConfig(cfg, normalized);
+  return accountConfig ? mergeAccountConfig(matrixBase, accountConfig) : matrixBase;
+}
 
 // Mutex for serializing account startup (workaround for concurrent dynamic import race condition)
 let matrixStartupLock: Promise<void> = Promise.resolve();
@@ -108,6 +117,10 @@ export const matrixPlugin: ChannelPlugin<ResolvedMatrixAccount> = {
     reactions: true,
     threads: true,
     media: true,
+    blockStreaming: true,
+  },
+  streaming: {
+    blockStreamingCoalesceDefaults: { minChars: 1500, idleMs: 1000 },
   },
   reload: { configPrefixes: ["channels.matrix"] },
   configSchema: buildChannelConfigSchema(MatrixConfigSchema),
@@ -147,7 +160,7 @@ export const matrixPlugin: ChannelPlugin<ResolvedMatrixAccount> = {
       baseUrl: account.homeserver,
     }),
     resolveAllowFrom: ({ cfg, accountId }) => {
-      const matrixConfig = resolveMatrixAccountConfig({ cfg: cfg as CoreConfig, accountId });
+      const matrixConfig = resolveMatrixAccountConfig(cfg as CoreConfig, accountId);
       return (matrixConfig.dm?.allowFrom ?? []).map((entry: string | number) => String(entry));
     },
     formatAllowFrom: ({ allowFrom }) => normalizeMatrixAllowList(allowFrom),
@@ -185,7 +198,7 @@ export const matrixPlugin: ChannelPlugin<ResolvedMatrixAccount> = {
   },
   threading: {
     resolveReplyToMode: ({ cfg, accountId }) =>
-      resolveMatrixAccountConfig({ cfg: cfg as CoreConfig, accountId }).replyToMode ?? "off",
+      resolveMatrixAccountConfig(cfg as CoreConfig, accountId).replyToMode ?? "off",
     buildToolContext: ({ context, hasRepliedRef }) => {
       const currentTarget = context.To;
       return {
@@ -454,7 +467,17 @@ export const matrixPlugin: ChannelPlugin<ResolvedMatrixAccount> = {
       matrixStartupLock = new Promise<void>((resolve) => {
         releaseLock = resolve;
       });
-      await previousLock;
+      // Safety timeout: if a previous startup hangs, don't block all accounts forever.
+      const STARTUP_LOCK_TIMEOUT_MS = 30_000;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        previousLock,
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, STARTUP_LOCK_TIMEOUT_MS);
+        }),
+      ]).finally(() => {
+        if (timer) clearTimeout(timer);
+      });
 
       // Lazy import: the monitor pulls the reply pipeline; avoid ESM init cycles.
       // Wrap in try/finally to ensure lock is released even if import fails.

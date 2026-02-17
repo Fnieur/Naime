@@ -1,6 +1,5 @@
 import type { MatrixClient } from "@vector-im/matrix-bot-sdk";
 import { LogService } from "@vector-im/matrix-bot-sdk";
-import { normalizeAccountId } from "openclaw/plugin-sdk/account-id";
 import type { CoreConfig } from "../../types.js";
 import type { MatrixAuth } from "./types.js";
 import { resolveMatrixAuth } from "./config.js";
@@ -20,13 +19,12 @@ const sharedClientPromises = new Map<string, Promise<SharedMatrixClientState>>()
 const sharedClientStartPromises = new Map<string, Promise<void>>();
 
 function buildSharedClientKey(auth: MatrixAuth, accountId?: string | null): string {
-  const normalizedAccountId = normalizeAccountId(accountId);
   return [
     auth.homeserver,
     auth.userId,
     auth.accessToken,
     auth.encryption ? "e2ee" : "plain",
-    normalizedAccountId || DEFAULT_ACCOUNT_KEY,
+    accountId ?? DEFAULT_ACCOUNT_KEY,
   ].join("|");
 }
 
@@ -105,10 +103,10 @@ export async function resolveSharedMatrixClient(
     accountId?: string | null;
   } = {},
 ): Promise<MatrixClient> {
-  const accountId = normalizeAccountId(params.accountId);
   const auth =
-    params.auth ?? (await resolveMatrixAuth({ cfg: params.cfg, env: params.env, accountId }));
-  const key = buildSharedClientKey(auth, accountId);
+    params.auth ??
+    (await resolveMatrixAuth({ cfg: params.cfg, env: params.env, accountId: params.accountId }));
+  const key = buildSharedClientKey(auth, params.accountId);
   const shouldStart = params.startClient !== false;
 
   // Check if we already have a client for this key
@@ -144,7 +142,7 @@ export async function resolveSharedMatrixClient(
   const createPromise = createSharedMatrixClient({
     auth,
     timeoutMs: params.timeoutMs,
-    accountId,
+    accountId: params.accountId,
   });
   sharedClientPromises.set(key, createPromise);
   try {
@@ -196,6 +194,6 @@ export function stopSharedClient(key?: string): void {
  * to avoid stopping all accounts.
  */
 export function stopSharedClientForAccount(auth: MatrixAuth, accountId?: string | null): void {
-  const key = buildSharedClientKey(auth, normalizeAccountId(accountId));
+  const key = buildSharedClientKey(auth, accountId);
   stopSharedClient(key);
 }

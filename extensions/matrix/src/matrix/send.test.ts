@@ -62,6 +62,11 @@ const runtimeStub = {
 
 let sendMessageMatrix: typeof import("./send.js").sendMessageMatrix;
 
+beforeAll(async () => {
+  setMatrixRuntime(runtimeStub);
+  ({ sendMessageMatrix } = await import("./send.js"));
+});
+
 const makeClient = () => {
   const sendMessage = vi.fn().mockResolvedValue("evt1");
   const uploadContent = vi.fn().mockResolvedValue("mxc://example/file");
@@ -72,11 +77,6 @@ const makeClient = () => {
   } as unknown as import("@vector-im/matrix-bot-sdk").MatrixClient;
   return { client, sendMessage, uploadContent };
 };
-
-beforeAll(async () => {
-  setMatrixRuntime(runtimeStub);
-  ({ sendMessageMatrix } = await import("./send.js"));
-});
 
 describe("sendMessageMatrix media", () => {
   beforeEach(() => {

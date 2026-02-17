@@ -218,7 +218,7 @@ export async function monitorMatrixProvider(opts: MonitorMatrixOpts = {}): Promi
           ...cfg.channels?.matrix?.dm,
           allowFrom,
         },
-        groupAllowFrom,
+        ...(groupAllowFrom.length > 0 ? { groupAllowFrom } : {}),
         ...(roomsConfig ? { groups: roomsConfig } : {}),
       },
     },
@@ -285,6 +285,7 @@ export async function monitorMatrixProvider(opts: MonitorMatrixOpts = {}): Promi
     getRoomInfo,
     getMemberDisplayName,
     accountId: opts.accountId,
+    blockStreaming: accountConfig.blockStreaming,
   });
 
   registerMatrixMonitorEvents({

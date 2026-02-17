@@ -1,12 +1,24 @@
 import type { ChannelGroupContext, GroupToolPolicyConfig } from "openclaw/plugin-sdk";
-import type { CoreConfig } from "./types.js";
-import { resolveMatrixAccountConfig } from "./matrix/accounts.js";
+import { normalizeAccountId } from "openclaw/plugin-sdk";
+import type { CoreConfig, MatrixConfig } from "./types.js";
+import { mergeAccountConfig, resolveAccountConfig } from "./matrix/accounts.js";
 import { resolveMatrixRoomConfig } from "./matrix/monitor/rooms.js";
 
 function stripLeadingPrefixCaseInsensitive(value: string, prefix: string): string {
   return value.toLowerCase().startsWith(prefix.toLowerCase())
     ? value.slice(prefix.length).trim()
     : value;
+}
+
+/** Resolve merged config for a specific account (used for per-account groups config). */
+function resolveMatrixAccountConfigForGroup(
+  cfg: CoreConfig,
+  accountId?: string | null,
+): MatrixConfig {
+  const normalized = normalizeAccountId(accountId);
+  const matrixBase = cfg.channels?.matrix ?? {};
+  const accountConfig = resolveAccountConfig(cfg, normalized);
+  return accountConfig ? mergeAccountConfig(matrixBase, accountConfig) : matrixBase;
 }
 
 function resolveMatrixRoomConfigForGroup(params: ChannelGroupContext) {
@@ -19,7 +31,7 @@ function resolveMatrixRoomConfigForGroup(params: ChannelGroupContext) {
   const groupChannel = params.groupChannel?.trim() ?? "";
   const aliases = groupChannel ? [groupChannel] : [];
   const cfg = params.cfg as CoreConfig;
-  const matrixConfig = resolveMatrixAccountConfig({ cfg, accountId: params.accountId });
+  const matrixConfig = resolveMatrixAccountConfigForGroup(cfg, params.accountId);
   return resolveMatrixRoomConfig({
     rooms: matrixConfig.groups ?? matrixConfig.rooms,
     roomId,

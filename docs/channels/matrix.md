@@ -190,7 +190,6 @@ Notes:
   - `openclaw pairing approve matrix <CODE>`
 - Public DMs: `channels.matrix.dm.policy="open"` plus `channels.matrix.dm.allowFrom=["*"]`.
 - `channels.matrix.dm.allowFrom` accepts full Matrix user IDs (example: `@user:server`). The wizard resolves display names to user IDs when directory search finds a single exact match.
-- Do not use display names or bare localparts (example: `"Alice"` or `"alice"`). They are ambiguous and are ignored for allowlist matching. Use full `@user:server` IDs.
 
 ## Rooms (groups)
 
@@ -230,6 +229,44 @@ Notes:
 - `channels.matrix.replyToMode` controls reply-to metadata when not replying in a thread:
   - `off` (default), `first`, `all`
 
+## Block streaming
+
+Block streaming sends agent replies as they are generated, instead of batching
+everything until the agent finishes. Enable it per channel:
+
+```json5
+{
+  channels: {
+    matrix: {
+      blockStreaming: true, // enable block streaming (off by default)
+    },
+  },
+}
+```
+
+Coalescing merges short consecutive chunks before sending to reduce message spam:
+
+```json5
+{
+  channels: {
+    matrix: {
+      blockStreaming: true,
+      blockStreamingCoalesce: {
+        minChars: 1500, // wait for this many chars before sending
+        maxChars: 4000, // flush if buffer exceeds this
+        idleMs: 1000, // flush after this idle gap (ms)
+      },
+    },
+  },
+}
+```
+
+Sensible coalesce defaults (`minChars: 1500`, `idleMs: 1000`) are applied
+automatically when block streaming is enabled.
+
+See [Streaming and Chunking](/concepts/streaming) for the full set of controls
+(`blockStreamingBreak`, `blockStreamingChunk`, `humanDelay`, etc.).
+
 ## Capabilities
 
 | Feature         | Status                                                                                |
@@ -242,6 +279,7 @@ Notes:
 | Reactions       | ✅ Supported (send/read via tools)                                                    |
 | Polls           | ✅ Send supported; inbound poll starts are converted to text (responses/ends ignored) |
 | Location        | ✅ Supported (geo URI; altitude ignored)                                              |
+| Block streaming | ✅ Supported (`channels.matrix.blockStreaming: true`)                                 |
 | Native commands | ✅ Supported                                                                          |
 
 ## Troubleshooting
@@ -295,6 +333,8 @@ Provider options:
 - `channels.matrix.groups`: group allowlist + per-room settings map.
 - `channels.matrix.rooms`: legacy group allowlist/config.
 - `channels.matrix.replyToMode`: reply-to mode for threads/tags.
+- `channels.matrix.blockStreaming`: enable block streaming (default: `false`; required for streaming replies).
+- `channels.matrix.blockStreamingCoalesce`: block streaming coalesce tuning (`{ minChars, maxChars, idleMs }`).
 - `channels.matrix.mediaMaxMb`: inbound/outbound media cap (MB).
 - `channels.matrix.autoJoin`: invite handling (`always | allowlist | off`, default: always).
 - `channels.matrix.autoJoinAllowlist`: allowed room IDs/aliases for auto-join.
