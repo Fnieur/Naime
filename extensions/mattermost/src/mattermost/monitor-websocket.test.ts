@@ -185,24 +185,28 @@ describe("mattermost websocket monitor", () => {
       webSocketFactory: () => socket,
     });
 
-    socket.emitOpen();
-    socket.emitMessage(
-      Buffer.from(
-        JSON.stringify({
-          event: "reaction_added",
-          data: {
-            reaction: JSON.stringify({
-              user_id: "user-1",
-              post_id: "post-1",
-              emoji_name: "thumbsup",
-            }),
-          },
-        }),
-      ),
-    );
-    socket.emitClose(1000);
+    const promise = connectOnce();
 
-    await connectOnce();
+    queueMicrotask(() => {
+      socket.emitOpen();
+      socket.emitMessage(
+        Buffer.from(
+          JSON.stringify({
+            event: "reaction_added",
+            data: {
+              reaction: JSON.stringify({
+                user_id: "user-1",
+                post_id: "post-1",
+                emoji_name: "thumbsup",
+              }),
+            },
+          }),
+        ),
+      );
+      socket.emitClose(1000);
+    });
+
+    await promise;
 
     expect(onReaction).toHaveBeenCalledTimes(1);
     expect(onPosted).not.toHaveBeenCalled();
