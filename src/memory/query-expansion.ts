@@ -250,7 +250,7 @@ const KO_TRAILING_PARTICLES = [
   "과",
   "도",
   "만",
-].sort((a, b) => b.length - a.length);
+].toSorted((a, b) => b.length - a.length);
 
 const STOP_WORDS_ZH = new Set([
   // Pronouns
@@ -450,7 +450,9 @@ export function extractKeywords(query: string): string[] {
           break;
         }
       }
-      if (isStop) continue;
+      if (isStop) {
+        continue;
+      }
     }
     // Skip invalid keywords
     if (!isValidKeyword(token)) {
