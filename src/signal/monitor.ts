@@ -1,4 +1,3 @@
-import type { SignalEnhancementDeps } from "./monitor/signal-enhancements.js";
 import { chunkTextWithMode, resolveChunkMode, resolveTextChunkLimit } from "../auto-reply/chunk.js";
 import { DEFAULT_GROUP_HISTORY_LIMIT, type HistoryEntry } from "../auto-reply/reply/history.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
@@ -14,6 +13,7 @@ import { signalCheck, signalRpcRequest } from "./client.js";
 import { spawnSignalDaemon } from "./daemon.js";
 import { isSignalSenderAllowed, type resolveSignalSender } from "./identity.js";
 import { createSignalEventHandler } from "./monitor/event-handler.js";
+import type { SignalEnhancementDeps } from "./monitor/signal-enhancements.js";
 import { sendMessageSignal } from "./send.js";
 import { runSignalSseLoop } from "./sse-reconnect.js";
 
@@ -343,7 +343,6 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
     }
 
     // Signal enhancements: build enhancement deps
-    const requireMention = accountInfo.config.requireMention ?? false;
     const enhancementDeps: SignalEnhancementDeps = {
       cfg,
       baseUrl,
@@ -352,7 +351,7 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
       mediaMaxBytes,
       ignoreAttachments,
       fetchAttachment,
-      requireMention,
+      groups: accountInfo.config.groups,
     };
 
     const handleEvent = createSignalEventHandler({

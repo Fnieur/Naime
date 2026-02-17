@@ -1,4 +1,3 @@
-import type { SignalEventHandlerDeps, SignalReceivePayload } from "./event-handler.types.js";
 import { resolveHumanDelayConfig } from "../../agents/identity.js";
 import { hasControlCommand } from "../../auto-reply/command-detection.js";
 import { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
@@ -47,6 +46,7 @@ import {
   resolveSignalSender,
 } from "../identity.js";
 import { sendMessageSignal, sendReadReceiptSignal, sendTypingSignal } from "../send.js";
+import type { SignalEventHandlerDeps, SignalReceivePayload } from "./event-handler.types.js";
 import { renderSignalMentions } from "./mentions.js";
 import {
   buildEnhancedMessage,
@@ -525,7 +525,7 @@ export function createSignalEventHandler(
         deps: eDeps,
       });
     }
-    if (eDeps && checkRequireMention({ dataMessage, isGroup, deps: eDeps })) {
+    if (eDeps && checkRequireMention({ dataMessage, isGroup, groupId, deps: eDeps })) {
       return;
     }
 
