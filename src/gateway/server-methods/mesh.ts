@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { GatewayRequestHandlerOptions, GatewayRequestHandlers, RespondFn } from "./types.js";
+import type { GatewayRequestHandlerOptions, GatewayRequestHandlers, RespondFn } from "./types.js";
 import { agentCommand } from "../../commands/agent.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -15,7 +16,6 @@ import {
   type MeshWorkflowPlan,
 } from "../protocol/index.js";
 import { agentHandlers } from "./agent.js";
-import type { GatewayRequestHandlerOptions, GatewayRequestHandlers, RespondFn } from "./types.js";
 
 type MeshStepStatus = "pending" | "running" | "succeeded" | "failed" | "skipped";
 type MeshRunStatus = "pending" | "running" | "completed" | "failed";
