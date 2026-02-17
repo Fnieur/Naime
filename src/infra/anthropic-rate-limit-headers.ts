@@ -104,10 +104,7 @@ export function shouldHaltSpawning(capacityPercentage: number | null, haltAt: nu
  * With caching, only uncached tokens count toward ITPM.
  * Example: 1M ITPM raw + 80% cache hit = 5M effective (1M / 0.2).
  */
-export function calculateEffectiveITPM(
-  rawITPM: number,
-  estimatedCacheHitRate: number,
-): number {
+export function calculateEffectiveITPM(rawITPM: number, estimatedCacheHitRate: number): number {
   const uncachedPortion = Math.max(0.01, 1 - estimatedCacheHitRate);
   return Math.round(rawITPM / uncachedPortion);
 }

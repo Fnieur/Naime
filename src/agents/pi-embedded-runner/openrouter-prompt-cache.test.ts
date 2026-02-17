@@ -1,6 +1,6 @@
+import type { StreamFn } from "@mariozechner/pi-agent-core";
 import { describe, it, expect } from "vitest";
 import { createOpenRouterPromptCacheWrapper } from "./openrouter-prompt-cache.js";
-import type { StreamFn } from "@mariozechner/pi-agent-core";
 
 describe("OpenRouter Prompt Cache", () => {
   it("should detect cacheable models", () => {

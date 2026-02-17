@@ -4,15 +4,15 @@ import { log } from "./logger.js";
 
 /**
  * OpenRouter Prompt Caching Wrapper
- * 
+ *
  * Injects cache_control headers into message content for OpenRouter models
  * that support prompt caching (Gemini, Claude via OpenRouter, etc.)
- * 
+ *
  * Caching is applied to:
  * - System messages (full cache for stable instructions)
  * - Long user messages (first 90% marked for cache, last 10% for context)
  * - Tool results (stable reference content)
- * 
+ *
  * This reduces latency and costs by up to 90% on cached tokens.
  * @see https://openrouter.ai/docs/guides/caching
  */
@@ -204,9 +204,11 @@ export function createOpenRouterPromptCacheWrapper(
     `[OpenRouter Caching] enabled for ${provider}/${modelId} - will inject cache_control headers`,
   );
 
-  const underlying = baseStreamFn ?? (() => {
-    throw new Error("baseStreamFn required for caching wrapper");
-  });
+  const underlying =
+    baseStreamFn ??
+    (() => {
+      throw new Error("baseStreamFn required for caching wrapper");
+    });
 
   const wrappedStreamFn: StreamFn = (model, context, options) => {
     const originalOnPayload = options?.onPayload;

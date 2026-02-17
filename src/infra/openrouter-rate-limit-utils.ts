@@ -65,7 +65,7 @@ export const OPENROUTER_MODEL_PROFILES: Record<string, OpenRouterModelProfile> =
     rpm: null, // credit-based, no hard RPM
     isFree: false,
     inputPricePerMillion: 0.15,
-    outputPricePerMillion: 0.60,
+    outputPricePerMillion: 0.6,
   },
   "anthropic/claude-haiku-4-5-20251001": {
     rpm: null,
