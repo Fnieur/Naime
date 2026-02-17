@@ -3,9 +3,6 @@ import { fetchWithTimeout } from "../utils/fetch-timeout.js";
 import { getTelegramApiBase } from "./api-base.js";
 import { makeProxyFetch } from "./proxy.js";
 
-// Lazy: must not cache at module load — env vars aren't applied yet.
-const telegramApiBase = () => getTelegramApiBase();
-
 export type TelegramProbe = BaseProbeResult & {
   status?: number | null;
   elapsedMs: number;
@@ -23,10 +20,12 @@ export async function probeTelegram(
   token: string,
   timeoutMs: number,
   proxyUrl?: string,
+  apiRoot?: string,
 ): Promise<TelegramProbe> {
   const started = Date.now();
   const fetcher = proxyUrl ? makeProxyFetch(proxyUrl) : fetch;
-  const base = `${telegramApiBase()}/bot${token}`;
+  // Lazy: must not cache at module load — env vars aren't applied yet.
+  const base = `${getTelegramApiBase(apiRoot)}/bot${token}`;
   const retryDelayMs = Math.max(50, Math.min(1000, timeoutMs));
 
   const result: TelegramProbe = {
