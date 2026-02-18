@@ -128,6 +128,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "0.14.1",
     "@aws-sdk/client-bedrock": "^3.992.0",
+    "@aws-sdk/client-s3": "^3.992.0",
+    "@aws-sdk/lib-storage": "^3.992.0",
     "@buape/carbon": "0.14.0",
     "@clack/prompts": "^1.0.1",
     "@grammyjs/runner": "^2.0.3",
@@ -191,6 +193,7 @@
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260217.1",
     "@vitest/coverage-v8": "^4.0.18",
+    "aws-sdk-client-mock": "^4.1.0",
     "lit": "^3.3.2",
     "ollama": "^0.6.3",
     "oxfmt": "0.33.0",
