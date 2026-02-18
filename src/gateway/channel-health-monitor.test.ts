@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelId } from "../channels/plugins/types.js";
 import type { ChannelAccountSnapshot } from "../channels/plugins/types.js";
-import type { ChannelManager, ChannelRuntimeSnapshot } from "./server-channels.js";
 import { startChannelHealthMonitor } from "./channel-health-monitor.js";
+import type { ChannelManager, ChannelRuntimeSnapshot } from "./server-channels.js";
 
 function createMockChannelManager(overrides?: Partial<ChannelManager>): ChannelManager {
   return {
@@ -353,7 +353,7 @@ describe("channel-health-monitor", () => {
     expect(manager.startChannel).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(500);
     expect(manager.startChannel).toHaveBeenCalledTimes(1);
-    releaseStart?.();
+    (releaseStart as (() => void) | null)?.();
     await Promise.resolve();
     monitor.stop();
   });

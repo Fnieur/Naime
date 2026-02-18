@@ -10,12 +10,15 @@ const convertMarkdownTablesMock = vi.hoisted(() => vi.fn((text: string) => text)
 const resolveMarkdownTableModeMock = vi.hoisted(() => vi.fn(() => "code"));
 
 vi.mock("../send.js", () => ({
-  sendMessageIMessage: (...args: unknown[]) => sendMessageIMessageMock(...args),
+  sendMessageIMessage: (...args: Parameters<typeof sendMessageIMessageMock>) =>
+    sendMessageIMessageMock(...args),
 }));
 
 vi.mock("../../auto-reply/chunk.js", () => ({
-  chunkTextWithMode: (...args: unknown[]) => chunkTextWithModeMock(...args),
-  resolveChunkMode: (...args: unknown[]) => resolveChunkModeMock(...args),
+  chunkTextWithMode: (...args: Parameters<typeof chunkTextWithModeMock>) =>
+    chunkTextWithModeMock(...args),
+  resolveChunkMode: (...args: Parameters<typeof resolveChunkModeMock>) =>
+    resolveChunkModeMock(...args),
 }));
 
 vi.mock("../../config/config.js", () => ({
@@ -23,11 +26,13 @@ vi.mock("../../config/config.js", () => ({
 }));
 
 vi.mock("../../config/markdown-tables.js", () => ({
-  resolveMarkdownTableMode: (...args: unknown[]) => resolveMarkdownTableModeMock(...args),
+  resolveMarkdownTableMode: (...args: Parameters<typeof resolveMarkdownTableModeMock>) =>
+    resolveMarkdownTableModeMock(...args),
 }));
 
 vi.mock("../../markdown/tables.js", () => ({
-  convertMarkdownTables: (...args: unknown[]) => convertMarkdownTablesMock(...args),
+  convertMarkdownTables: (...args: Parameters<typeof convertMarkdownTablesMock>) =>
+    convertMarkdownTablesMock(...args),
 }));
 
 import { deliverReplies } from "./deliver.js";
