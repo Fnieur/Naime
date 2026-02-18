@@ -7,7 +7,7 @@ import { baileys, getLastSocket, resetBaileysMocks, resetLoadConfigMock } from "
 
 const { createWaSocket, formatError, logWebSelfId, waitForWaConnection } =
   await import("./session.js");
-const useMultiFileAuthStateMock = vi.mocked(baileys.useMultiFileAuthState);
+let useMultiFileAuthStateMock = vi.mocked(baileys.useMultiFileAuthState);
 
 function mockCredsJsonSpies(readContents: string) {
   const credsSuffix = path.join(".openclaw", "credentials", "whatsapp", "default", "creds.json");
@@ -47,6 +47,7 @@ describe("web session", () => {
     vi.clearAllMocks();
     resetBaileysMocks();
     resetLoadConfigMock();
+    useMultiFileAuthStateMock = vi.mocked(baileys.useMultiFileAuthState);
   });
 
   afterEach(() => {
