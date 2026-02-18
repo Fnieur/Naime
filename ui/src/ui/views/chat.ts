@@ -1,6 +1,6 @@
+import { virtualize } from "@lit-labs/virtualizer/virtualize.js";
 import { html, nothing } from "lit";
 import { ref } from "lit/directives/ref.js";
-import { repeat } from "lit/directives/repeat.js";
 import {
   renderMessageGroup,
   renderReadingIndicatorGroup,
@@ -221,10 +221,10 @@ export function renderChat(props: ChatProps) {
             `
           : nothing
       }
-      ${repeat(
-        buildChatItems(props),
-        (item) => item.key,
-        (item) => {
+      ${virtualize({
+        items: buildChatItems(props),
+        keyFunction: (item) => item.key,
+        renderItem: (item) => {
           if (item.kind === "divider") {
             return html`
               <div class="chat-divider" role="separator" data-ts=${String(item.timestamp)}>
@@ -257,9 +257,9 @@ export function renderChat(props: ChatProps) {
             });
           }
 
-          return nothing;
+          return html``;
         },
-      )}
+      })}
     </div>
   `;
 
@@ -427,8 +427,6 @@ export function renderChat(props: ChatProps) {
   `;
 }
 
-const CHAT_HISTORY_RENDER_LIMIT = 200;
-
 function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   const result: Array<ChatItem | MessageGroup> = [];
   let currentGroup: MessageGroup | null = null;
@@ -474,19 +472,7 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
   const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
-  const historyStart = Math.max(0, history.length - CHAT_HISTORY_RENDER_LIMIT);
-  if (historyStart > 0) {
-    items.push({
-      kind: "message",
-      key: "chat:history:notice",
-      message: {
-        role: "system",
-        content: `Showing last ${CHAT_HISTORY_RENDER_LIMIT} messages (${historyStart} hidden).`,
-        timestamp: Date.now(),
-      },
-    });
-  }
-  for (let i = historyStart; i < history.length; i++) {
+  for (let i = 0; i < history.length; i++) {
     const msg = history[i];
     const normalized = normalizeMessage(msg);
     const raw = msg as Record<string, unknown>;
