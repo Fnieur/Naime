@@ -132,9 +132,16 @@ export async function handleToolExecutionStart(
   ctx: ToolHandlerContext,
   evt: AgentEvent & { toolName: string; toolCallId: string; args: unknown },
 ) {
-  // Flush pending block replies to preserve message boundaries before tool execution.
+  // Hold before draining so pre-tool text can coalesce with post-tool text.
+  const canHoldBlockReplies = typeof ctx.params.onBlockReplyHold === "function";
+  if (canHoldBlockReplies) {
+    ctx.params.onBlockReplyHold!();
+  }
+  // Drain pending block chunks into the reply pipeline before tool execution.
   ctx.flushBlockReplyBuffer();
-  if (ctx.params.onBlockReplyFlush) {
+  // Legacy fallback: if hold/resume hooks are unavailable, force flush to preserve
+  // old tool-boundary behavior.
+  if (!canHoldBlockReplies && ctx.params.onBlockReplyFlush) {
     void ctx.params.onBlockReplyFlush();
   }
 
@@ -260,6 +267,9 @@ export async function handleToolExecutionEnd(
     result?: unknown;
   },
 ) {
+  // Resume coalescer idle timer now that tool execution is complete
+  ctx.params.onBlockReplyResume?.();
+
   const toolName = normalizeToolName(String(evt.toolName));
   const toolCallId = String(evt.toolCallId);
   const isError = Boolean(evt.isError);

@@ -88,6 +88,30 @@ describe("handleToolExecutionStart read path checks", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0] ?? "")).toContain("read tool called without path");
   });
+
+  it("holds before draining block buffer and skips force flush when hold callback exists", async () => {
+    const { ctx, onBlockReplyFlush } = createTestContext();
+    const onBlockReplyHold = vi.fn();
+    const flushBlockReplyBuffer = vi.fn();
+    ctx.params.onBlockReplyHold = onBlockReplyHold;
+    ctx.flushBlockReplyBuffer = flushBlockReplyBuffer;
+
+    const evt: ToolExecutionStartEvent = {
+      type: "tool_execution_start",
+      toolName: "bash",
+      toolCallId: "tool-3",
+      args: { command: "echo test" },
+    };
+
+    await handleToolExecutionStart(ctx, evt);
+
+    expect(onBlockReplyHold).toHaveBeenCalledTimes(1);
+    expect(flushBlockReplyBuffer).toHaveBeenCalledTimes(1);
+    expect(onBlockReplyFlush).not.toHaveBeenCalled();
+    expect(onBlockReplyHold.mock.invocationCallOrder[0]).toBeLessThan(
+      flushBlockReplyBuffer.mock.invocationCallOrder[0],
+    );
+  });
 });
 
 describe("handleToolExecutionEnd cron.add commitment tracking", () => {

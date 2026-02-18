@@ -67,14 +67,6 @@ export function __setModelCatalogImportForTest(loader?: () => Promise<PiSdkModul
   importPiSdk = loader ?? defaultImportPiSdk;
 }
 
-function createAuthStorage(AuthStorageLike: unknown, path: string) {
-  const withFactory = AuthStorageLike as { create?: (path: string) => unknown };
-  if (typeof withFactory.create === "function") {
-    return withFactory.create(path);
-  }
-  return new (AuthStorageLike as { new (path: string): unknown })(path);
-}
-
 export async function loadModelCatalog(params?: {
   config?: OpenClawConfig;
   useCache?: boolean;
@@ -109,17 +101,12 @@ export async function loadModelCatalog(params?: {
       const piSdk = await importPiSdk();
       const agentDir = resolveOpenClawAgentDir();
       const { join } = await import("node:path");
-      const authStorage = createAuthStorage(piSdk.AuthStorage, join(agentDir, "auth.json"));
-      const registry = new (piSdk.ModelRegistry as unknown as {
-        new (
-          authStorage: unknown,
-          modelsFile: string,
-        ):
-          | Array<DiscoveredModel>
-          | {
-              getAll: () => Array<DiscoveredModel>;
-            };
-      })(authStorage, join(agentDir, "models.json"));
+      const authStorage = new piSdk.AuthStorage(join(agentDir, "auth.json"));
+      const registry = new piSdk.ModelRegistry(authStorage, join(agentDir, "models.json")) as
+        | {
+            getAll: () => Array<DiscoveredModel>;
+          }
+        | Array<DiscoveredModel>;
       const entries = Array.isArray(registry) ? registry : registry.getAll();
       for (const entry of entries) {
         const id = String(entry?.id ?? "").trim();

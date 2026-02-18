@@ -1,28 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
-import type { loadSessionEntry as loadSessionEntryType } from "./session-utils.js";
-
-const buildSessionLookup = (
-  sessionKey: string,
-  entry: {
-    sessionId?: string;
-    lastChannel?: string;
-    lastTo?: string;
-    updatedAt?: number;
-  } = {},
-): ReturnType<typeof loadSessionEntryType> => ({
-  cfg: { session: { mainKey: "agent:main:main" } } as OpenClawConfig,
-  storePath: "/tmp/sessions.json",
-  store: {} as ReturnType<typeof loadSessionEntryType>["store"],
-  entry: {
-    sessionId: entry.sessionId ?? `sid-${sessionKey}`,
-    updatedAt: entry.updatedAt ?? Date.now(),
-    lastChannel: entry.lastChannel,
-    lastTo: entry.lastTo,
-  },
-  canonicalKey: sessionKey,
-  legacyKey: undefined,
-});
 
 vi.mock("../infra/system-events.js", () => ({
   enqueueSystemEvent: vi.fn(),
@@ -41,7 +17,11 @@ vi.mock("../config/sessions.js", () => ({
   updateSessionStore: vi.fn(),
 }));
 vi.mock("./session-utils.js", () => ({
-  loadSessionEntry: vi.fn((sessionKey: string) => buildSessionLookup(sessionKey)),
+  loadSessionEntry: vi.fn((sessionKey: string) => ({
+    storePath: "/tmp/sessions.json",
+    entry: { sessionId: `sid-${sessionKey}` },
+    canonicalKey: sessionKey,
+  })),
   pruneLegacyStoreKeys: vi.fn(),
   resolveGatewaySessionStoreTarget: vi.fn(({ key }: { key: string }) => ({
     canonicalKey: key,
@@ -299,7 +279,11 @@ describe("agent request events", () => {
     updateSessionStoreMock.mockImplementation(async (_storePath, update) => {
       update({});
     });
-    loadSessionEntryMock.mockImplementation((sessionKey: string) => buildSessionLookup(sessionKey));
+    loadSessionEntryMock.mockImplementation((sessionKey: string) => ({
+      storePath: "/tmp/sessions.json",
+      entry: { sessionId: `sid-${sessionKey}` },
+      canonicalKey: sessionKey,
+    }));
   });
 
   it("disables delivery when route is unresolved instead of falling back globally", async () => {
@@ -333,11 +317,12 @@ describe("agent request events", () => {
   it("reuses the current session route when delivery target is omitted", async () => {
     const ctx = buildCtx();
     loadSessionEntryMock.mockReturnValueOnce({
-      ...buildSessionLookup("agent:main:main", {
+      storePath: "/tmp/sessions.json",
+      entry: {
         sessionId: "sid-current",
         lastChannel: "telegram",
         lastTo: "123",
-      }),
+      },
       canonicalKey: "agent:main:main",
     });
 
