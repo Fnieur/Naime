@@ -115,7 +115,7 @@ export async function runAgentTurnWithFallback(params: {
           return { skip: true };
         }
         let text = payload.text;
-        if (!params.isHeartbeat && text?.includes("HEARTBEAT_OK")) {
+        if (text?.includes("HEARTBEAT_OK")) {
           const stripped = stripHeartbeatToken(text, {
             mode: "message",
           });
