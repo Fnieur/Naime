@@ -322,7 +322,7 @@ describe("channel-health-monitor", () => {
   });
 
   it("runs checks single-flight when restart work is still in progress", async () => {
-    let releaseStart: (() => void) | null = null;
+    let releaseStart!: () => void;
     const startGate = new Promise<void>((resolve) => {
       releaseStart = resolve;
     });
@@ -353,7 +353,7 @@ describe("channel-health-monitor", () => {
     expect(manager.startChannel).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(500);
     expect(manager.startChannel).toHaveBeenCalledTimes(1);
-    releaseStart?.();
+    releaseStart();
     await Promise.resolve();
     monitor.stop();
   });

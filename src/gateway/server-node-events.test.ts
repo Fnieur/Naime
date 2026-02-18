@@ -18,9 +18,12 @@ vi.mock("../config/sessions.js", () => ({
 }));
 vi.mock("./session-utils.js", () => ({
   loadSessionEntry: vi.fn((sessionKey: string) => ({
+    cfg: { session: { mainKey: "agent:main:main" } },
     storePath: "/tmp/sessions.json",
-    entry: { sessionId: `sid-${sessionKey}` },
+    store: {},
+    entry: { sessionId: `sid-${sessionKey}`, updatedAt: Date.now() },
     canonicalKey: sessionKey,
+    legacyKey: undefined,
   })),
   pruneLegacyStoreKeys: vi.fn(),
   resolveGatewaySessionStoreTarget: vi.fn(({ key }: { key: string }) => ({
@@ -280,9 +283,12 @@ describe("agent request events", () => {
       update({});
     });
     loadSessionEntryMock.mockImplementation((sessionKey: string) => ({
+      cfg: { session: { mainKey: "agent:main:main" } },
       storePath: "/tmp/sessions.json",
-      entry: { sessionId: `sid-${sessionKey}` },
+      store: {},
+      entry: { sessionId: `sid-${sessionKey}`, updatedAt: Date.now() },
       canonicalKey: sessionKey,
+      legacyKey: undefined,
     }));
   });
 
@@ -317,13 +323,17 @@ describe("agent request events", () => {
   it("reuses the current session route when delivery target is omitted", async () => {
     const ctx = buildCtx();
     loadSessionEntryMock.mockReturnValueOnce({
+      cfg: { session: { mainKey: "agent:main:main" } },
       storePath: "/tmp/sessions.json",
+      store: {},
       entry: {
         sessionId: "sid-current",
         lastChannel: "telegram",
         lastTo: "123",
+        updatedAt: Date.now(),
       },
       canonicalKey: "agent:main:main",
+      legacyKey: undefined,
     });
 
     await handleNodeEvent(ctx, "node-route-hit", {
