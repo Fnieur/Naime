@@ -42,6 +42,7 @@ export function createGatewayHooksRequestHandler(params: {
     thinking?: string;
     timeoutSeconds?: number;
     allowUnsafeExternalContent?: boolean;
+    agentId?: string;
   }) => {
     const sessionKey = value.sessionKey.trim();
     const mainSessionKey = resolveMainSessionKeyFromConfig();
@@ -81,6 +82,7 @@ export function createGatewayHooksRequestHandler(params: {
           job,
           message: value.message,
           sessionKey,
+          agentId: value.agentId,
           lane: "cron",
         });
         const summary = result.summary?.trim() || result.error?.trim() || result.status;
