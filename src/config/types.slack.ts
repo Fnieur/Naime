@@ -22,6 +22,13 @@ export type SlackDmConfig = {
   groupChannels?: Array<string | number>;
   /** @deprecated Prefer channels.slack.replyToModeByChatType.direct. */
   replyToMode?: ReplyToMode;
+  /**
+   * When true, top-level DM messages are routed to a per-message thread session
+   * instead of the main session. Requires replyToMode "all" or "first" for DMs.
+   * This means each new DM message starts its own thread session immediately.
+   * Default: false.
+   */
+  threadSession?: boolean;
 };
 
 export type SlackChannelConfig = {

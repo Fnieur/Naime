@@ -112,13 +112,17 @@ describe("slack prepareSlackMessage inbound contract", () => {
     });
   }
 
-  function createSlackAccount(config: ResolvedSlackAccount["config"] = {}): ResolvedSlackAccount {
+  function createSlackAccount(
+    config: ResolvedSlackAccount["config"] = {},
+    overrides: Partial<ResolvedSlackAccount> = {},
+  ): ResolvedSlackAccount {
     return {
       accountId: "default",
       enabled: true,
       botTokenSource: "config",
       appTokenSource: "config",
       config,
+      ...overrides,
     };
   }
 
@@ -404,6 +408,114 @@ describe("slack prepareSlackMessage inbound contract", () => {
     expect(prepared!.ctxPayload.Body).toMatch(/\[slack message id: 1\.000 channel: D123\]$/);
     expect(prepared!.ctxPayload.Body).not.toContain("thread_ts");
     expect(prepared!.ctxPayload.Body).not.toContain("parent_user_id");
+  });
+
+  describe("dm.threadSession", () => {
+    function createDmThreadSessionCtx(replyToMode: "off" | "all" | "first" = "all") {
+      const ctx = createInboundSlackCtx({
+        cfg: {
+          channels: { slack: { enabled: true } },
+        } as OpenClawConfig,
+        replyToMode: replyToMode as "off" | "all",
+      });
+      // oxlint-disable-next-line typescript/no-explicit-any
+      ctx.resolveUserName = async () => ({ name: "Alice" }) as any;
+      return ctx;
+    }
+
+    it("routes top-level DM to thread session when dm.threadSession is true", async () => {
+      const ctx = createDmThreadSessionCtx("all");
+      const account = createSlackAccount(
+        {},
+        {
+          replyToMode: "all",
+          dm: { threadSession: true },
+        },
+      );
+      const message = createSlackMessage({
+        channel: "D123",
+        channel_type: "im",
+        user: "U1",
+        text: "hello",
+        ts: "1700000000.0001",
+      });
+
+      const result = await prepareMessageWith(ctx, account, message);
+
+      expect(result).not.toBeNull();
+      expect(result!.ctxPayload.SessionKey).toContain("thread:1700000000.0001");
+      expect(result!.ctxPayload.IsFirstThreadTurn).toBe(true);
+    });
+
+    it("does NOT route to thread session when dm.threadSession is false", async () => {
+      const ctx = createDmThreadSessionCtx("all");
+      const account = createSlackAccount(
+        {},
+        {
+          replyToMode: "all",
+          dm: { threadSession: false },
+        },
+      );
+      const message = createSlackMessage({
+        channel: "D123",
+        channel_type: "im",
+        user: "U1",
+        text: "hello",
+        ts: "1700000000.0001",
+      });
+
+      const result = await prepareMessageWith(ctx, account, message);
+
+      expect(result).not.toBeNull();
+      expect(result!.ctxPayload.SessionKey).not.toContain("thread:");
+    });
+
+    it("does NOT route to thread session when replyToMode is off", async () => {
+      const ctx = createDmThreadSessionCtx("off");
+      const account = createSlackAccount(
+        {},
+        {
+          replyToMode: "off",
+          dm: { threadSession: true },
+        },
+      );
+      const message = createSlackMessage({
+        channel: "D123",
+        channel_type: "im",
+        user: "U1",
+        text: "hello",
+        ts: "1700000000.0001",
+      });
+
+      const result = await prepareMessageWith(ctx, account, message);
+
+      expect(result).not.toBeNull();
+      expect(result!.ctxPayload.SessionKey).not.toContain("thread:");
+    });
+
+    it("routes to thread session when replyToModeByChatType.direct is all", async () => {
+      const ctx = createDmThreadSessionCtx("off");
+      const account = createSlackAccount(
+        {},
+        {
+          replyToMode: "off",
+          replyToModeByChatType: { direct: "all" },
+          dm: { threadSession: true },
+        },
+      );
+      const message = createSlackMessage({
+        channel: "D123",
+        channel_type: "im",
+        user: "U1",
+        text: "hello",
+        ts: "1700000000.0001",
+      });
+
+      const result = await prepareMessageWith(ctx, account, message);
+
+      expect(result).not.toBeNull();
+      expect(result!.ctxPayload.SessionKey).toContain("thread:1700000000.0001");
+    });
   });
 });
 

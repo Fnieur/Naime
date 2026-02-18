@@ -227,6 +227,7 @@ and still route command execution against the target conversation session (`Comm
 - With default `session.dmScope=main`, Slack DMs collapse to agent main session.
 - Channel sessions: `agent:<agentId>:slack:channel:<channelId>`.
 - Thread replies can create thread session suffixes (`:thread:<threadTs>`) when applicable.
+- `channels.slack.dm.threadSession: true` promotes every top-level DM to its own thread session. The bot replies as a Slack thread, and follow-ups stay in that thread's isolated session. Requires `replyToMode` set to `"all"` or `"first"` for DMs. Default: `false`.
 - `channels.slack.thread.historyScope` default is `thread`; `thread.inheritParent` default is `false`.
 - `channels.slack.thread.initialHistoryLimit` controls how many existing thread messages are fetched when a new thread session starts (default `20`; set `0` to disable).
 
@@ -497,7 +498,7 @@ Primary reference:
   - mode/auth: `mode`, `botToken`, `appToken`, `signingSecret`, `webhookPath`, `accounts.*`
   - DM access: `dm.enabled`, `dmPolicy`, `allowFrom` (legacy: `dm.policy`, `dm.allowFrom`), `dm.groupEnabled`, `dm.groupChannels`
   - channel access: `groupPolicy`, `channels.*`, `channels.*.users`, `channels.*.requireMention`
-  - threading/history: `replyToMode`, `replyToModeByChatType`, `thread.*`, `historyLimit`, `dmHistoryLimit`, `dms.*.historyLimit`
+  - threading/history: `replyToMode`, `replyToModeByChatType`, `dm.threadSession`, `thread.*`, `historyLimit`, `dmHistoryLimit`, `dms.*.historyLimit`
   - delivery: `textChunkLimit`, `chunkMode`, `mediaMaxMb`
   - ops/features: `configWrites`, `commands.native`, `slashCommand.*`, `actions.*`, `userToken`, `userTokenReadOnly`
 

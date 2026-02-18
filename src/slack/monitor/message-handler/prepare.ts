@@ -32,7 +32,7 @@ import { buildPairingReply } from "../../../pairing/pairing-messages.js";
 import { upsertChannelPairingRequest } from "../../../pairing/pairing-store.js";
 import { resolveAgentRoute } from "../../../routing/resolve-route.js";
 import { resolveThreadSessionKeys } from "../../../routing/session-key.js";
-import type { ResolvedSlackAccount } from "../../accounts.js";
+import { resolveSlackReplyToMode, type ResolvedSlackAccount } from "../../accounts.js";
 import { reactSlackMessage } from "../../actions.js";
 import { sendMessageSlack } from "../../send.js";
 import { resolveSlackThreadContext } from "../../threading.js";
@@ -202,10 +202,29 @@ export async function prepareSlackMessage(params: {
   const threadContext = resolveSlackThreadContext({ message, replyToMode: ctx.replyToMode });
   const threadTs = threadContext.incomingThreadTs;
   const isThreadReply = threadContext.isThreadReply;
+
+  // When dm.threadSession is enabled and a top-level DM arrives (not already a thread reply),
+  // route it to a per-message thread session so each DM starts its own thread.
+  const dmThreadSession = account.dm?.threadSession === true;
+  const dmReplyToMode = resolveSlackReplyToMode(account, "direct");
+  const shouldPromoteDmToThread =
+    isDirectMessage &&
+    !isThreadReply &&
+    dmThreadSession &&
+    (dmReplyToMode === "all" || dmReplyToMode === "first");
+  const effectiveThreadId = shouldPromoteDmToThread
+    ? threadContext.messageTs
+    : isThreadReply
+      ? threadTs
+      : undefined;
+
   const threadKeys = resolveThreadSessionKeys({
     baseSessionKey,
-    threadId: isThreadReply ? threadTs : undefined,
-    parentSessionKey: isThreadReply && ctx.threadInheritParent ? baseSessionKey : undefined,
+    threadId: effectiveThreadId,
+    parentSessionKey:
+      (isThreadReply || shouldPromoteDmToThread) && ctx.threadInheritParent
+        ? baseSessionKey
+        : undefined,
   });
   const sessionKey = threadKeys.sessionKey;
   const historyKey =
@@ -612,7 +631,9 @@ export async function prepareSlackMessage(params: {
     ThreadStarterBody: threadStarterBody,
     ThreadHistoryBody: threadHistoryBody,
     IsFirstThreadTurn:
-      isThreadReply && threadTs && !threadSessionPreviousTimestamp ? true : undefined,
+      (isThreadReply && threadTs && !threadSessionPreviousTimestamp) || shouldPromoteDmToThread
+        ? true
+        : undefined,
     ThreadLabel: threadLabel,
     Timestamp: message.ts ? Math.round(Number(message.ts) * 1000) : undefined,
     WasMentioned: isRoomish ? effectiveWasMentioned : undefined,

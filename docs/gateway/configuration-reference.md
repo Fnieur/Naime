@@ -280,7 +280,7 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
       appToken: "xapp-...",
       dmPolicy: "pairing",
       allowFrom: ["U123", "U456", "*"],
-      dm: { enabled: true, groupEnabled: false, groupChannels: ["G123"] },
+      dm: { enabled: true, groupEnabled: false, groupChannels: ["G123"], threadSession: true },
       channels: {
         C123: { allow: true, requireMention: true, allowBots: false },
         "#general": {
@@ -329,7 +329,7 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
 
 **Reaction notification modes:** `off`, `own` (default), `all`, `allowlist` (from `reactionAllowlist`).
 
-**Thread session isolation:** `thread.historyScope` is per-thread (default) or shared across channel. `thread.inheritParent` copies parent channel transcript to new threads.
+**Thread session isolation:** `thread.historyScope` is per-thread (default) or shared across channel. `thread.inheritParent` copies parent channel transcript to new threads. `dm.threadSession: true` promotes each top-level DM into its own thread session, preventing context cross-contamination between conversations. Requires `replyToMode` `"all"` or `"first"` for DMs.
 
 | Action group | Default | Notes                  |
 | ------------ | ------- | ---------------------- |
