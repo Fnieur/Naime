@@ -66,6 +66,7 @@ function applyJobResult(
   result: {
     status: CronRunStatus;
     error?: string;
+    delivered?: boolean;
     startedAt: number;
     endedAt: number;
   },
@@ -75,6 +76,7 @@ function applyJobResult(
   job.state.lastStatus = result.status;
   job.state.lastDurationMs = Math.max(0, result.endedAt - result.startedAt);
   job.state.lastError = result.error;
+  job.state.lastDelivered = result.delivered;
   job.updatedAtMs = result.endedAt;
 
   // Track consecutive errors for backoff / auto-disable.
@@ -305,6 +307,7 @@ export async function onTimer(state: CronServiceState) {
           const shouldDelete = applyJobResult(state, job, {
             status: result.status,
             error: result.error,
+            delivered: result.delivered,
             startedAt: result.startedAt,
             endedAt: result.endedAt,
           });
@@ -562,6 +565,7 @@ async function executeJobCore(
     summary: res.summary,
     sessionId: res.sessionId,
     sessionKey: res.sessionKey,
+    delivered: res.delivered,
     model: res.model,
     provider: res.provider,
     usage: res.usage,
@@ -600,6 +604,7 @@ export async function executeJob(
   const shouldDelete = applyJobResult(state, job, {
     status: coreResult.status,
     error: coreResult.error,
+    delivered: coreResult.delivered,
     startedAt,
     endedAt,
   });
@@ -629,6 +634,7 @@ function emitJobFinished(
     summary: result.summary,
     sessionId: result.sessionId,
     sessionKey: result.sessionKey,
+    delivered: result.delivered,
     runAtMs,
     durationMs: job.state.lastDurationMs,
     nextRunAtMs: job.state.nextRunAtMs,
