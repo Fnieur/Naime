@@ -9,6 +9,7 @@
   "ignorePatterns": [
     "apps/",
     "assets/",
+    "deploy/helm/",
     "dist/",
     "docs/_layouts/",
     "node_modules/",
