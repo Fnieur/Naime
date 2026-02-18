@@ -400,7 +400,6 @@ export async function runProviderEntry(params: {
     if (!provider.transcribeAudio) {
       throw new Error(`Audio transcription provider "${providerId}" not available.`);
     }
-    const transcribeAudio = provider.transcribeAudio;
     const media = await params.cache.getBuffer({
       attachmentIndex: params.attachmentIndex,
       maxBytes,
@@ -435,7 +434,7 @@ export async function runProviderEntry(params: {
       provider: providerId,
       apiKeys,
       execute: async (apiKey) =>
-        transcribeAudio({
+        provider.transcribeAudio({
           buffer: media.buffer,
           fileName: media.fileName,
           mime: media.mime,
@@ -461,7 +460,6 @@ export async function runProviderEntry(params: {
   if (!provider.describeVideo) {
     throw new Error(`Video understanding provider "${providerId}" not available.`);
   }
-  const describeVideo = provider.describeVideo;
   const media = await params.cache.getBuffer({
     attachmentIndex: params.attachmentIndex,
     maxBytes,
@@ -491,7 +489,7 @@ export async function runProviderEntry(params: {
     provider: providerId,
     apiKeys,
     execute: (apiKey) =>
-      describeVideo({
+      provider.describeVideo({
         buffer: media.buffer,
         fileName: media.fileName,
         mime: media.mime,

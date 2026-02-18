@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { AgentTool, AgentToolResult } from "@mariozechner/pi-agent-core";
+import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import { describe, expect, it, vi } from "vitest";
 import "./test-helpers/fast-coding-tools.js";
@@ -577,17 +577,6 @@ describe("createOpenClawCodingTools", () => {
   });
 
   it("strips truncation.content details from read results while preserving other fields", async () => {
-    const readResult: AgentToolResult<unknown> = {
-      content: [{ type: "text" as const, text: "line-0001" }],
-      details: {
-        truncation: {
-          truncated: true,
-          outputLines: 1,
-          firstLineExceedsLimit: false,
-          content: "hidden duplicate payload",
-        },
-      },
-    };
     const baseRead: AgentTool = {
       name: "read",
       label: "read",
@@ -597,7 +586,17 @@ describe("createOpenClawCodingTools", () => {
         offset: Type.Optional(Type.Number()),
         limit: Type.Optional(Type.Number()),
       }),
-      execute: vi.fn(async () => readResult),
+      execute: vi.fn(async () => ({
+        content: [{ type: "text", text: "line-0001" }],
+        details: {
+          truncation: {
+            truncated: true,
+            outputLines: 1,
+            firstLineExceedsLimit: false,
+            content: "hidden duplicate payload",
+          },
+        },
+      })),
     };
 
     const wrapped = createOpenClawReadTool(

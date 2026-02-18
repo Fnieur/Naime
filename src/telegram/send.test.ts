@@ -1442,7 +1442,9 @@ describe("createForumTopicTelegram", () => {
       message_thread_id: 272,
       name: "Build Updates",
     });
-    const api = { createForumTopic } as unknown as Bot["api"];
+    const api = { createForumTopic } as unknown as {
+      createForumTopic: typeof createForumTopic;
+    };
 
     const result = await createForumTopicTelegram("telegram:group:-1001234567890:topic:271", "x", {
       token: "tok",
@@ -1462,7 +1464,9 @@ describe("createForumTopicTelegram", () => {
       message_thread_id: 300,
       name: "Roadmap",
     });
-    const api = { createForumTopic } as unknown as Bot["api"];
+    const api = { createForumTopic } as unknown as {
+      createForumTopic: typeof createForumTopic;
+    };
 
     await createForumTopicTelegram("-1001234567890", "Roadmap", {
       token: "tok",
