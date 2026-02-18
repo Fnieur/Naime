@@ -28,6 +28,23 @@ describe("failover-error", () => {
     expect(resolveFailoverReasonFromError({ code: "ECONNRESET" })).toBe("timeout");
   });
 
+  it("infers network errors from connectivity error codes", () => {
+    expect(resolveFailoverReasonFromError({ code: "ENETUNREACH" })).toBe("network");
+    expect(resolveFailoverReasonFromError({ code: "EHOSTUNREACH" })).toBe("network");
+    expect(resolveFailoverReasonFromError({ code: "ENOTFOUND" })).toBe("network");
+    expect(resolveFailoverReasonFromError({ code: "EAI_AGAIN" })).toBe("network");
+    expect(resolveFailoverReasonFromError({ code: "ECONNREFUSED" })).toBe("network");
+  });
+
+  it("infers network errors from error messages", () => {
+    expect(resolveFailoverReasonFromError({ message: "network unreachable" })).toBe("network");
+    expect(resolveFailoverReasonFromError({ message: "connection refused" })).toBe("network");
+    expect(
+      resolveFailoverReasonFromError({ message: "getaddrinfo ENOTFOUND api.example.com" }),
+    ).toBe("network");
+    expect(resolveFailoverReasonFromError({ message: "fetch failed" })).toBe("network");
+  });
+
   it("infers timeout from abort stop-reason messages", () => {
     expect(resolveFailoverReasonFromError({ message: "Unhandled stop reason: abort" })).toBe(
       "timeout",
@@ -63,6 +80,19 @@ describe("failover-error", () => {
     });
     expect(err?.reason).toBe("format");
     expect(err?.status).toBe(400);
+  });
+
+  it("coerces network errors with a 503 status", () => {
+    const err = coerceToFailoverError(
+      { code: "ENETUNREACH", message: "network unreachable" },
+      {
+        provider: "anthropic",
+        model: "claude-opus-4-5",
+      },
+    );
+    expect(err?.reason).toBe("network");
+    expect(err?.status).toBe(503);
+    expect(err?.code).toBe("ENETUNREACH");
   });
 
   it("describes non-Error values consistently", () => {

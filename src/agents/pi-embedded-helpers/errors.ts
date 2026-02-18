@@ -635,6 +635,19 @@ const ERROR_PATTERNS = {
     "messages.1.content.1.tool_use.id",
     "invalid request format",
   ],
+  network: [
+    /\benetunreach\b/i,
+    /\behostunreach\b/i,
+    /\benotfound\b/i,
+    /\beai_again\b/i,
+    /\beconnrefused\b/i,
+    /\bnetwork\s+(?:is\s+)?unreachable\b/i,
+    /\bconnection\s+refused\b/i,
+    /\bgetaddrinfo\b/i,
+    /\bfetch\s+failed\b/i,
+    /\bno\s+(?:network|internet)\s+connection\b/i,
+    /\bdns\s+(?:lookup|resolution)\s+failed\b/i,
+  ],
 } as const;
 
 const TOOL_CALL_INPUT_MISSING_RE =
@@ -704,6 +717,10 @@ export function isAuthErrorMessage(raw: string): boolean {
 
 export function isOverloadedErrorMessage(raw: string): boolean {
   return matchesErrorPatterns(raw, ERROR_PATTERNS.overloaded);
+}
+
+export function isNetworkErrorMessage(raw: string): boolean {
+  return matchesErrorPatterns(raw, ERROR_PATTERNS.network);
 }
 
 export function parseImageDimensionError(raw: string): {
@@ -794,6 +811,9 @@ export function classifyFailoverReason(raw: string): FailoverReason | null {
   }
   if (isTimeoutErrorMessage(raw)) {
     return "timeout";
+  }
+  if (isNetworkErrorMessage(raw)) {
+    return "network";
   }
   if (isAuthErrorMessage(raw)) {
     return "auth";

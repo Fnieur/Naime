@@ -51,6 +51,8 @@ export function resolveFailoverStatus(reason: FailoverReason): number | undefine
       return 408;
     case "format":
       return 400;
+    case "network":
+      return 503; // Service Unavailable - appropriate for network connectivity issues
     default:
       return undefined;
   }
@@ -166,6 +168,10 @@ export function resolveFailoverReasonFromError(err: unknown): FailoverReason | n
   }
 
   const code = (getErrorCode(err) ?? "").toUpperCase();
+  // Network connectivity errors - trigger fallback to local models
+  if (["ENETUNREACH", "EHOSTUNREACH", "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED"].includes(code)) {
+    return "network";
+  }
   if (["ETIMEDOUT", "ESOCKETTIMEDOUT", "ECONNRESET", "ECONNABORTED"].includes(code)) {
     return "timeout";
   }
