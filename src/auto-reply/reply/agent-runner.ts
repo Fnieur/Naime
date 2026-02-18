@@ -44,6 +44,7 @@ import {
 } from "./post-compaction-audit.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
+import { isGenerationCurrent } from "./queue/state.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
 import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
 import { createTypingSignaler } from "./typing-mode.js";
@@ -119,6 +120,7 @@ export async function runReplyAgent(params: {
   sessionCtx: TemplateContext;
   shouldInjectGroupIntro: boolean;
   typingMode: TypingMode;
+  generationId?: number;
 }): Promise<ReplyPayload | ReplyPayload[] | undefined> {
   const {
     commandBody,
@@ -145,6 +147,7 @@ export async function runReplyAgent(params: {
     sessionCtx,
     shouldInjectGroupIntro,
     typingMode,
+    generationId = 0,
   } = params;
 
   let activeSessionEntry = sessionEntry;
@@ -370,6 +373,13 @@ export async function runReplyAgent(params: {
     });
 
     if (runOutcome.kind === "final") {
+      // Check if this run was superseded by an interrupt before delivering.
+      if (!isGenerationCurrent(queueKey, generationId)) {
+        defaultRuntime.error(
+          `Skipping stale response for ${queueKey} (generationId ${generationId} superseded)`,
+        );
+        return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
+      }
       return finalizeWithFollowup(runOutcome.payload, queueKey, runFollowupTurn);
     }
 
@@ -605,6 +615,15 @@ export async function runReplyAgent(params: {
       } catch {
         // Silent failure — audit is best-effort
       }
+    }
+
+    // Guard against delivering a stale response after an interrupt superseded this run.
+    // See: https://github.com/openclaw/openclaw/issues/19426
+    if (!isGenerationCurrent(queueKey, generationId)) {
+      defaultRuntime.error(
+        `Skipping stale response for ${queueKey} (generationId ${generationId} superseded)`,
+      );
+      return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
     }
 
     return finalizeWithFollowup(

@@ -19,6 +19,32 @@ export const DEFAULT_QUEUE_DROP: QueueDropPolicy = "summarize";
 
 export const FOLLOWUP_QUEUES = new Map<string, FollowupQueueState>();
 
+/**
+ * Tracks the latest generation ID per session queue key.
+ * Each interrupt increments the counter; responses check their generationId
+ * against the latest before sending to avoid delivering stale replies.
+ * See: https://github.com/openclaw/openclaw/issues/19426
+ */
+export const SESSION_GENERATION_IDS = new Map<string, number>();
+
+export function getSessionGenerationId(queueKey: string): number {
+  return SESSION_GENERATION_IDS.get(queueKey) ?? 0;
+}
+
+export function incrementSessionGenerationId(queueKey: string): number {
+  const next = (SESSION_GENERATION_IDS.get(queueKey) ?? 0) + 1;
+  SESSION_GENERATION_IDS.set(queueKey, next);
+  return next;
+}
+
+export function clearSessionGenerationId(queueKey: string): boolean {
+  return SESSION_GENERATION_IDS.delete(queueKey);
+}
+
+export function isGenerationCurrent(queueKey: string, generationId: number): boolean {
+  return (SESSION_GENERATION_IDS.get(queueKey) ?? 0) === generationId;
+}
+
 export function getFollowupQueue(key: string, settings: QueueSettings): FollowupQueueState {
   const existing = FOLLOWUP_QUEUES.get(key);
   if (existing) {
