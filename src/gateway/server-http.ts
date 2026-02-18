@@ -51,6 +51,7 @@ import {
 import { sendGatewayAuthFailure } from "./http-common.js";
 import { getBearerToken, getHeader } from "./http-utils.js";
 import { isPrivateOrLoopbackAddress, resolveGatewayClientIp } from "./net.js";
+import { applySecurityHeaders } from "./security-headers.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
 import type { GatewayWsClient } from "./server/ws-types.js";
@@ -483,6 +484,10 @@ export function createGatewayHttpServer(opts: {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
       const requestPath = new URL(req.url ?? "/", "http://localhost").pathname;
+
+      // Apply security response headers early, before any handler sends a body.
+      applySecurityHeaders(res, requestPath, { tlsEnabled: Boolean(opts.tlsOptions) });
+
       if (await handleHooksRequest(req, res)) {
         return;
       }
