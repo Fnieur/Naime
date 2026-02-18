@@ -1,7 +1,7 @@
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { loadDotEnv } from "../infra/dotenv.js";
-import { normalizeEnv } from "../infra/env.js";
+import { isTruthyEnvValue, normalizeEnv } from "../infra/env.js";
 import { formatUncaughtError } from "../infra/errors.js";
 import { isMainModule } from "../infra/is-main.js";
 import { ensureOpenClawCliOnPath } from "../infra/path-env.js";
@@ -61,6 +61,100 @@ export function shouldEnsureCliPath(argv: string[]): boolean {
   return true;
 }
 
+const ROOT_OPTIONS_WITH_VALUE = new Set(["--profile"]);
+
+export function scanInteractiveRootArgv(argv: string[]): {
+  primary: string | null;
+  hasInteractiveFlag: boolean;
+  strippedArgv: string[];
+} {
+  const args = argv.slice(2);
+  const next: string[] = [];
+  let primary: string | null = null;
+  let hasInteractiveFlag = false;
+  let expectOptionValue = false;
+  let sawPrimary = false;
+
+  for (const arg of args) {
+    if (!sawPrimary) {
+      if (expectOptionValue) {
+        expectOptionValue = false;
+        next.push(arg);
+        continue;
+      }
+      if (arg === "--") {
+        sawPrimary = true;
+        next.push(arg);
+        continue;
+      }
+      if (arg === "-i" || arg === "--interactive") {
+        hasInteractiveFlag = true;
+        continue;
+      }
+      if (arg.startsWith("--profile=")) {
+        next.push(arg);
+        continue;
+      }
+      if (ROOT_OPTIONS_WITH_VALUE.has(arg)) {
+        expectOptionValue = true;
+        next.push(arg);
+        continue;
+      }
+      if (!arg.startsWith("-")) {
+        primary = arg;
+        sawPrimary = true;
+      }
+    }
+    next.push(arg);
+  }
+
+  return {
+    primary,
+    hasInteractiveFlag,
+    strippedArgv: [...argv.slice(0, 2), ...next],
+  };
+}
+
+export function shouldUseInteractiveCommandSelector(params: {
+  argv: string[];
+  stdinIsTTY: boolean;
+  stdoutIsTTY: boolean;
+  ciEnv?: string;
+  disableSelectorEnv?: string;
+}): boolean {
+  if (hasHelpOrVersion(params.argv)) {
+    return false;
+  }
+  const root = scanInteractiveRootArgv(params.argv);
+  if (!root.hasInteractiveFlag) {
+    return false;
+  }
+  // Keep -i as an explicit interactive entrypoint only for root invocations.
+  // If a real command is already present, run it normally and ignore -i.
+  if (root.primary) {
+    return false;
+  }
+  if (!params.stdinIsTTY || !params.stdoutIsTTY) {
+    return false;
+  }
+  if (isTruthyEnvValue(params.ciEnv) || isTruthyEnvValue(params.disableSelectorEnv)) {
+    return false;
+  }
+  return true;
+}
+
+export function stripInteractiveSelectorArgs(argv: string[]): string[] {
+  return scanInteractiveRootArgv(argv).strippedArgv;
+}
+
+export function isCommanderExitError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && code.startsWith("commander.");
+}
+
 export async function runCli(argv: string[] = process.argv) {
   const normalizedArgv = normalizeWindowsArgv(argv);
   loadDotEnv({ quiet: true });
@@ -91,7 +185,18 @@ export async function runCli(argv: string[] = process.argv) {
     process.exit(1);
   });
 
-  const parseArgv = rewriteUpdateFlagArgv(normalizedArgv);
+  let parseArgv = rewriteUpdateFlagArgv(normalizedArgv);
+  const useInteractiveSelector = shouldUseInteractiveCommandSelector({
+    argv: parseArgv,
+    stdinIsTTY: Boolean(process.stdin.isTTY),
+    stdoutIsTTY: Boolean(process.stdout.isTTY),
+    ciEnv: process.env.CI,
+    disableSelectorEnv: process.env.OPENCLAW_DISABLE_COMMAND_SELECTOR,
+  });
+  if (useInteractiveSelector) {
+    parseArgv = stripInteractiveSelectorArgs(parseArgv);
+  }
+
   // Register the primary command (builtin or subcli) so help and command parsing
   // are correct even with lazy command registration.
   const primary = getPrimaryCommand(parseArgv);
@@ -118,6 +223,38 @@ export async function runCli(argv: string[] = process.argv) {
     const { registerPluginCliCommands } = await import("../plugins/cli.js");
     const { loadConfig } = await import("../config/config.js");
     registerPluginCliCommands(program, loadConfig());
+  }
+
+  if (useInteractiveSelector) {
+    const interactiveBaseArgv = parseArgv;
+    const { runInteractiveCommandSelector } = await import("./program/command-selector.js");
+    const { runCommandQuestionnaire } = await import("./program/command-questionnaire.js");
+
+    // In interactive mode we keep the process alive and return to the main menu
+    // after each command run (or handled command-parse/help exit).
+    program.exitOverride();
+    while (true) {
+      const selectedPath = await runInteractiveCommandSelector(program);
+      if (!selectedPath || selectedPath.length === 0) {
+        // Exit silently when leaving interactive mode.
+        return;
+      }
+
+      const promptArgs = await runCommandQuestionnaire({ program, commandPath: selectedPath });
+      if (promptArgs === null) {
+        // User cancelled parameter entry: return to the main picker.
+        continue;
+      }
+
+      const commandArgv = [...interactiveBaseArgv, ...selectedPath, ...promptArgs];
+      try {
+        await program.parseAsync(commandArgv);
+      } catch (error) {
+        if (!isCommanderExitError(error)) {
+          console.error("[openclaw] Command failed:", formatUncaughtError(error));
+        }
+      }
+    }
   }
 
   await program.parseAsync(parseArgv);
