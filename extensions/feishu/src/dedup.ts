@@ -1,11 +1,13 @@
 // Prevent duplicate processing when WebSocket reconnects or Feishu redelivers messages.
+// Scope dedup by account to avoid cross-account collisions when multiple Feishu bots
+// receive the same group message ID in one OpenClaw process.
 const DEDUP_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const DEDUP_MAX_SIZE = 1_000;
 const DEDUP_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // cleanup every 5 minutes
-const processedMessageIds = new Map<string, number>(); // messageId -> timestamp
+const processedMessageIds = new Map<string, number>(); // dedupKey -> timestamp
 let lastCleanupTime = Date.now();
 
-export function tryRecordMessage(messageId: string): boolean {
+export function tryRecordMessage(messageId: string, scope = "default"): boolean {
   const now = Date.now();
 
   // Throttled cleanup: evict expired entries at most once per interval.
@@ -18,7 +20,9 @@ export function tryRecordMessage(messageId: string): boolean {
     lastCleanupTime = now;
   }
 
-  if (processedMessageIds.has(messageId)) {
+  const dedupKey = `${scope}:${messageId}`;
+
+  if (processedMessageIds.has(dedupKey)) {
     return false;
   }
 
@@ -28,6 +32,6 @@ export function tryRecordMessage(messageId: string): boolean {
     processedMessageIds.delete(first);
   }
 
-  processedMessageIds.set(messageId, now);
+  processedMessageIds.set(dedupKey, now);
   return true;
 }
