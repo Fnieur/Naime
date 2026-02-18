@@ -716,6 +716,8 @@ export const registerTelegramNativeCommands = ({
             to,
             accountId,
             messageThreadId: threadSpec.id,
+            chatId: String(chatId),
+            messageId: String(msg.message_id),
           });
 
           await deliverReplies({
