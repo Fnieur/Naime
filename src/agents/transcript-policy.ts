@@ -95,10 +95,10 @@ export function resolveTranscriptPolicy(params: {
 
   const needsNonImageSanitize = isGoogle || isAnthropic || isMistral || isOpenRouterGemini;
 
-  const sanitizeToolCallIds = isGoogle || isMistral || isAnthropic;
+  const sanitizeToolCallIds = !isOpenAi;
   const toolCallIdMode: ToolCallIdMode | undefined = isMistral
     ? "strict9"
-    : sanitizeToolCallIds
+    : !isOpenAi
       ? "strict"
       : undefined;
   const repairToolUseResultPairing = isGoogle || isAnthropic;

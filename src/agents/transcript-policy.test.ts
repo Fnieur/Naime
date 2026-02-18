@@ -39,4 +39,61 @@ describe("resolveTranscriptPolicy", () => {
     expect(policy.sanitizeToolCallIds).toBe(false);
     expect(policy.toolCallIdMode).toBeUndefined();
   });
+
+  it("enables sanitizeToolCallIds for unknown OpenAI-compatible providers", () => {
+    const policy = resolveTranscriptPolicy({
+      provider: "nvidia",
+      modelId: "moonshotai/kimi-k2.5",
+      modelApi: "openai-completions",
+    });
+    expect(policy.sanitizeToolCallIds).toBe(true);
+    expect(policy.toolCallIdMode).toBe("strict");
+  });
+
+  it("enables sanitizeToolCallIds when provider is empty and modelApi is not OpenAI", () => {
+    const policy = resolveTranscriptPolicy({
+      provider: "",
+      modelId: "some-model",
+      modelApi: "anthropic-messages",
+    });
+    expect(policy.sanitizeToolCallIds).toBe(true);
+  });
+
+  it("disables sanitizeToolCallIds for openai-codex provider", () => {
+    const policy = resolveTranscriptPolicy({
+      provider: "openai-codex",
+      modelId: "codex-mini",
+      modelApi: "openai-codex-responses",
+    });
+    expect(policy.sanitizeToolCallIds).toBe(false);
+    expect(policy.toolCallIdMode).toBeUndefined();
+  });
+
+  it("disables sanitizeToolCallIds when no provider and modelApi is openai-completions", () => {
+    // No provider + OpenAI API => treated as OpenAI
+    const policy = resolveTranscriptPolicy({
+      modelApi: "openai-completions",
+    });
+    expect(policy.sanitizeToolCallIds).toBe(false);
+  });
+
+  it("enables sanitizeToolCallIds for openrouter with non-gemini model", () => {
+    const policy = resolveTranscriptPolicy({
+      provider: "openrouter",
+      modelId: "anthropic/claude-opus-4-5",
+      modelApi: "openai-completions",
+    });
+    expect(policy.sanitizeToolCallIds).toBe(true);
+    expect(policy.toolCallIdMode).toBe("strict");
+  });
+
+  it("uses strict9 for Mistral model on third-party provider", () => {
+    const policy = resolveTranscriptPolicy({
+      provider: "openrouter",
+      modelId: "mistralai/devstral-2512:free",
+      modelApi: "openai-responses",
+    });
+    expect(policy.sanitizeToolCallIds).toBe(true);
+    expect(policy.toolCallIdMode).toBe("strict9");
+  });
 });
