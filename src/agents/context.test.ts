@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyConfiguredContextWindows, applyDiscoveredContextWindows } from "./context.js";
+import {
+  _lookupFromCache,
+  applyConfiguredContextWindows,
+  applyDiscoveredContextWindows,
+} from "./context.js";
 import { createSessionManagerRuntimeRegistry } from "./pi-extensions/session-manager-runtime-registry.js";
 
 describe("applyDiscoveredContextWindows", () => {
@@ -18,8 +22,8 @@ describe("applyDiscoveredContextWindows", () => {
 });
 
 describe("applyConfiguredContextWindows", () => {
-  it("overrides discovered cache values with explicit models.providers contextWindow", () => {
-    const cache = new Map<string, number>([["anthropic/claude-opus-4-6", 1_000_000]]);
+  it("stores entries under provider-qualified keys (provider/modelId)", () => {
+    const cache = new Map<string, number>();
     applyConfiguredContextWindows({
       cache,
       modelsConfig: {
@@ -31,10 +35,29 @@ describe("applyConfiguredContextWindows", () => {
       },
     });
 
-    expect(cache.get("anthropic/claude-opus-4-6")).toBe(200_000);
+    // OpenRouter uses "provider/model" style IDs — the resulting cache key is
+    // "openrouter/anthropic/claude-opus-4-6". Keys are opaque; we never split them.
+    expect(cache.get("openrouter/anthropic/claude-opus-4-6")).toBe(200_000);
+    expect(cache.has("anthropic/claude-opus-4-6")).toBe(false);
   });
 
-  it("adds config-only model context windows and ignores invalid entries", () => {
+  it("separates same model id from different providers", () => {
+    const cache = new Map<string, number>();
+    applyConfiguredContextWindows({
+      cache,
+      modelsConfig: {
+        providers: {
+          anthropic: { models: [{ id: "claude-sonnet-4-5", contextWindow: 64_000 }] },
+          openrouter: { models: [{ id: "claude-sonnet-4-5", contextWindow: 200_000 }] },
+        },
+      },
+    });
+
+    expect(cache.get("anthropic/claude-sonnet-4-5")).toBe(64_000);
+    expect(cache.get("openrouter/claude-sonnet-4-5")).toBe(200_000);
+  });
+
+  it("ignores invalid entries (zero contextWindow, empty id)", () => {
     const cache = new Map<string, number>();
     applyConfiguredContextWindows({
       cache,
@@ -51,8 +74,47 @@ describe("applyConfiguredContextWindows", () => {
       },
     });
 
-    expect(cache.get("custom/model")).toBe(150_000);
-    expect(cache.has("bad/model")).toBe(false);
+    expect(cache.get("openrouter/custom/model")).toBe(150_000);
+    expect(cache.has("openrouter/bad/model")).toBe(false);
+    expect(cache.size).toBe(1);
+  });
+});
+
+describe("_lookupFromCache", () => {
+  it("returns undefined when modelId is absent", () => {
+    const cache = new Map<string, number>([["anthropic/m", 100_000]]);
+    expect(_lookupFromCache(cache, { provider: "anthropic" })).toBeUndefined();
+    expect(_lookupFromCache(cache, {})).toBeUndefined();
+  });
+
+  it("returns provider-qualified value when provider + modelId match", () => {
+    const cache = new Map<string, number>([["anthropic/claude-sonnet-4-5", 64_000]]);
+    expect(
+      _lookupFromCache(cache, { provider: "anthropic", modelId: "claude-sonnet-4-5" }),
+    ).toBe(64_000);
+  });
+
+  it("falls back to bare model-id when provider-qualified key is absent", () => {
+    // Simulates a discovered model (no provider prefix in cache)
+    const cache = new Map<string, number>([["claude-sonnet-4-5", 200_000]]);
+    expect(
+      _lookupFromCache(cache, { provider: "anthropic", modelId: "claude-sonnet-4-5" }),
+    ).toBe(200_000);
+  });
+
+  it("uses bare model-id lookup when no provider is supplied", () => {
+    const cache = new Map<string, number>([["some-model", 128_000]]);
+    expect(_lookupFromCache(cache, { modelId: "some-model" })).toBe(128_000);
+  });
+
+  it("prefers provider-qualified over bare when both exist", () => {
+    const cache = new Map<string, number>([
+      ["anthropic/claude-sonnet-4-5", 64_000],
+      ["claude-sonnet-4-5", 200_000],
+    ]);
+    expect(
+      _lookupFromCache(cache, { provider: "anthropic", modelId: "claude-sonnet-4-5" }),
+    ).toBe(64_000);
   });
 });
 
