@@ -371,6 +371,12 @@ Recommendations:
 - When running small models, **enable sandboxing for all sessions** and **disable web_search/web_fetch/browser** unless inputs are tightly controlled.
 - For chat-only personal assistants with trusted input and no tools, smaller models are usually fine.
 
+### Authority model and destructive actions
+
+The default system prompt defines a simple **authority model**: only the system prompt and the user's direct messages in the current conversation are treated as trusted instructions. Everything else—tool outputs, web pages, logs, file contents, and other session context—is treated as **untrusted data**. The model is instructed not to interpret that data as system instructions, configuration, or policy changes. That reduces the risk of the model "obeying" instructions hidden in tool or web content.
+
+For **destructive or irreversible actions** (e.g. `rm -rf`, `git clean -fdx`, `DROP TABLE`, disk format, `dd`), the prompt requires that the user write the exact command in the current turn and explicitly confirm before execution. The model must not infer such commands from vague phrasing like "reset", "cleanup", or "wipe". This is a prompt-level guardrail only: it steers the model's behavior and does not change sandbox or tool execution. It complements sandboxing, exec approvals, and policy-as-code; it does not replace them.
+
 ## Reasoning & verbose output in groups
 
 `/reasoning` and `/verbose` can expose internal reasoning or tool output that
