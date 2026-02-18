@@ -357,7 +357,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
         ? false
         : typeof account.config.blockStreaming === "boolean"
           ? !account.config.blockStreaming
-          : undefined,
+          : true,
       onModelSelected,
       onPartialReply: useStreaming
         ? undefined
