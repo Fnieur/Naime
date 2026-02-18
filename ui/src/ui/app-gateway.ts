@@ -12,6 +12,7 @@ import {
   refreshActiveTab,
   setLastActiveSessionKey,
 } from "./app-settings.ts";
+import { defaultGatewayUrlFromLocation, normalizeGatewayUrl } from "./gateway-url.ts";
 import { handleAgentEvent, resetToolStream, type AgentEventPayload } from "./app-tool-stream.ts";
 import { loadAgents } from "./controllers/agents.ts";
 import { loadAssistantIdentity } from "./controllers/assistant-identity.ts";
@@ -122,9 +123,18 @@ export function connectGateway(host: GatewayHost) {
   host.execApprovalQueue = [];
   host.execApprovalError = null;
 
+  const fallbackGatewayUrl = defaultGatewayUrlFromLocation();
+  const gatewayUrl = normalizeGatewayUrl(host.settings.gatewayUrl, fallbackGatewayUrl);
+  if (gatewayUrl !== host.settings.gatewayUrl) {
+    applySettings(host as unknown as Parameters<typeof applySettings>[0], {
+      ...host.settings,
+      gatewayUrl,
+    });
+  }
+
   const previousClient = host.client;
   const client = new GatewayBrowserClient({
-    url: host.settings.gatewayUrl,
+    url: gatewayUrl,
     token: host.settings.token.trim() ? host.settings.token : undefined,
     password: host.password.trim() ? host.password : undefined,
     clientName: "openclaw-control-ui",

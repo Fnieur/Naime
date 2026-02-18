@@ -2,6 +2,7 @@ const KEY = "openclaw.control.settings.v1";
 
 import type { ThemeMode } from "./theme.ts";
 import { isSupportedLocale } from "../i18n/index.ts";
+import { defaultGatewayUrlFromLocation, normalizeGatewayUrl } from "./gateway-url.ts";
 
 export type UiSettings = {
   gatewayUrl: string;
@@ -18,10 +19,7 @@ export type UiSettings = {
 };
 
 export function loadSettings(): UiSettings {
-  const defaultUrl = (() => {
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    return `${proto}://${location.host}`;
-  })();
+  const defaultUrl = defaultGatewayUrlFromLocation();
 
   const defaults: UiSettings = {
     gatewayUrl: defaultUrl,
@@ -43,10 +41,7 @@ export function loadSettings(): UiSettings {
     }
     const parsed = JSON.parse(raw) as Partial<UiSettings>;
     return {
-      gatewayUrl:
-        typeof parsed.gatewayUrl === "string" && parsed.gatewayUrl.trim()
-          ? parsed.gatewayUrl.trim()
-          : defaults.gatewayUrl,
+      gatewayUrl: normalizeGatewayUrl(parsed.gatewayUrl, defaults.gatewayUrl),
       token: typeof parsed.token === "string" ? parsed.token : defaults.token,
       sessionKey:
         typeof parsed.sessionKey === "string" && parsed.sessionKey.trim()
