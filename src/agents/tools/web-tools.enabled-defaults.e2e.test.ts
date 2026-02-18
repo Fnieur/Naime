@@ -79,6 +79,44 @@ describe("web tools defaults", () => {
     const tool = createWebSearchTool({ config: {}, sandboxed: false });
     expect(tool?.name).toBe("web_search");
   });
+
+  it("defaults web_search provider to DuckDuckGo and works without an API key", async () => {
+    const priorFetch = global.fetch;
+    try {
+      const mockFetch = vi.fn(async (_input?: RequestInfo | URL, _init?: RequestInit) => {
+        return Promise.resolve(
+          new Response(
+            `
+              <html>
+                <body>
+                  <a class="result__a" href="https://example.com/article">Example Result</a>
+                  <div class="result__snippet">Example snippet from DuckDuckGo.</div>
+                </body>
+              </html>
+            `,
+            { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
+          ),
+        );
+      });
+      global.fetch = withFetchPreconnect(mockFetch);
+      vi.unstubAllEnvs();
+
+      const tool = createWebSearchTool({ config: {}, sandboxed: true });
+      const result = await tool?.execute?.("call-1", { query: "duckduckgo default provider test" });
+      const details = result?.details as {
+        provider?: string;
+        results?: Array<{ title?: string; url?: string; description?: string }>;
+      };
+
+      expect(mockFetch).toHaveBeenCalledOnce();
+      expect(details.provider).toBe("duckduckgo");
+      expect(details.results?.[0]?.title).toContain("Example Result");
+      expect(details.results?.[0]?.url).toBe("https://example.com/article");
+      expect(details.results?.[0]?.description).toContain("Example snippet from DuckDuckGo.");
+    } finally {
+      global.fetch = priorFetch;
+    }
+  });
 });
 
 describe("web_search country and language parameters", () => {
@@ -102,7 +140,10 @@ describe("web_search country and language parameters", () => {
     }>,
   ) {
     const mockFetch = installMockFetch({ web: { results: [] } });
-    const tool = createWebSearchTool({ config: undefined, sandboxed: true });
+    const tool = createWebSearchTool({
+      config: { tools: { web: { search: { provider: "brave" } } } },
+      sandboxed: true,
+    });
     expect(tool).not.toBeNull();
     await tool?.execute?.("call-1", { query: "test", ...params });
     expect(mockFetch).toHaveBeenCalled();
@@ -121,7 +162,10 @@ describe("web_search country and language parameters", () => {
 
   it("rejects invalid freshness values", async () => {
     const mockFetch = installMockFetch({ web: { results: [] } });
-    const tool = createWebSearchTool({ config: undefined, sandboxed: true });
+    const tool = createWebSearchTool({
+      config: { tools: { web: { search: { provider: "brave" } } } },
+      sandboxed: true,
+    });
     const result = await tool?.execute?.("call-1", { query: "test", freshness: "yesterday" });
 
     expect(mockFetch).not.toHaveBeenCalled();
@@ -235,7 +279,10 @@ describe("web_search external content wrapping", () => {
     );
     global.fetch = withFetchPreconnect(mockFetch);
 
-    const tool = createWebSearchTool({ config: undefined, sandboxed: true });
+    const tool = createWebSearchTool({
+      config: { tools: { web: { search: { provider: "brave" } } } },
+      sandboxed: true,
+    });
     const result = await tool?.execute?.("call-1", { query: "test" });
     const details = result?.details as {
       externalContent?: { untrusted?: boolean; source?: string; wrapped?: boolean };
@@ -273,7 +320,10 @@ describe("web_search external content wrapping", () => {
     );
     global.fetch = withFetchPreconnect(mockFetch);
 
-    const tool = createWebSearchTool({ config: undefined, sandboxed: true });
+    const tool = createWebSearchTool({
+      config: { tools: { web: { search: { provider: "brave" } } } },
+      sandboxed: true,
+    });
     const result = await tool?.execute?.("call-1", { query: "unique-test-url-not-wrapped" });
     const details = result?.details as { results?: Array<{ url?: string }> };
 
@@ -303,7 +353,10 @@ describe("web_search external content wrapping", () => {
     );
     global.fetch = withFetchPreconnect(mockFetch);
 
-    const tool = createWebSearchTool({ config: undefined, sandboxed: true });
+    const tool = createWebSearchTool({
+      config: { tools: { web: { search: { provider: "brave" } } } },
+      sandboxed: true,
+    });
     const result = await tool?.execute?.("call-1", { query: "unique-test-site-name-wrapping" });
     const details = result?.details as { results?: Array<{ siteName?: string }> };
 
@@ -333,7 +386,10 @@ describe("web_search external content wrapping", () => {
     );
     global.fetch = withFetchPreconnect(mockFetch);
 
-    const tool = createWebSearchTool({ config: undefined, sandboxed: true });
+    const tool = createWebSearchTool({
+      config: { tools: { web: { search: { provider: "brave" } } } },
+      sandboxed: true,
+    });
     const result = await tool?.execute?.("call-1", {
       query: "unique-test-brave-published-wrapping",
     });
