@@ -208,7 +208,11 @@ function resolveFallbackCandidates(params: {
     if (!resolved) {
       continue;
     }
-    addCandidate(resolved.ref, true);
+    // Explicitly configured fallbacks always bypass the allowlist: the user
+    // intentionally listed them as fallbacks, so filtering them out via the
+    // model-picker allowlist (agents.defaults.models) would silently break
+    // cross-provider failover.
+    addCandidate(resolved.ref, false);
   }
 
   if (params.fallbacksOverride === undefined && primary?.provider && primary.model) {

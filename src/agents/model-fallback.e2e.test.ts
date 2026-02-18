@@ -136,7 +136,9 @@ describe("runWithModelFallback", () => {
       },
       usageStats: {
         [profileId]: {
-          cooldownUntil: Date.now() + 60_000,
+          // Cooldown must exceed the 2-minute probe margin so the primary
+          // is skipped outright rather than probed.
+          cooldownUntil: Date.now() + 5 * 60_000,
         },
       },
     };
@@ -473,5 +475,167 @@ describe("runWithModelFallback", () => {
     expect(run).toHaveBeenCalledTimes(2);
     expect(result.provider).toBe("openai");
     expect(result.model).toBe("gpt-4.1-mini");
+  });
+
+  // Cross-provider failover tests
+  describe("cross-provider failover on rate limit", () => {
+    it("falls back to a different provider when primary 429s", async () => {
+      const cfg = makeCfg({
+        agents: {
+          defaults: {
+            model: {
+              primary: "google/gemini-3-pro-preview",
+              fallbacks: ["anthropic/claude-opus-4-6"],
+            },
+          },
+        },
+      });
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }))
+        .mockResolvedValueOnce("ok");
+
+      const result = await runWithModelFallback({
+        cfg,
+        provider: "google",
+        model: "gemini-3-pro-preview",
+        run,
+      });
+
+      expect(result.result).toBe("ok");
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(run.mock.calls[0]?.[0]).toBe("google");
+      expect(run.mock.calls[1]?.[0]).toBe("anthropic");
+      expect(run.mock.calls[1]?.[1]).toBe("claude-opus-4-6");
+      expect(result.attempts[0]?.reason).toBe("rate_limit");
+    });
+
+    it("fallbacks bypass the agents.defaults.models allowlist (#5744)", async () => {
+      // Regression: when agents.defaults.models is configured, fallback models not listed
+      // there were silently dropped from the candidate list, causing "All models failed (1)"
+      // even though a cross-provider fallback was explicitly configured.
+      const cfg = {
+        agents: {
+          defaults: {
+            model: {
+              primary: "google/gemini-3-pro-preview",
+              fallbacks: ["anthropic/claude-opus-4-6"],
+            },
+            // Allowlist contains only google — anthropic NOT listed here
+            models: {
+              "google/gemini-3-pro-preview": {},
+              "google/gemini-2.5-flash": {},
+            },
+          },
+        },
+      } as OpenClawConfig;
+
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }))
+        .mockResolvedValueOnce("ok");
+
+      const result = await runWithModelFallback({
+        cfg,
+        provider: "google",
+        model: "gemini-3-pro-preview",
+        run,
+      });
+
+      // Anthropic should be attempted even though it is absent from the allowlist
+      expect(result.result).toBe("ok");
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(run.mock.calls[1]?.[0]).toBe("anthropic");
+      expect(run.mock.calls[1]?.[1]).toBe("claude-opus-4-6");
+    });
+
+    it("skips same-provider fallback in cooldown and succeeds on different-provider fallback", async () => {
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-xprovider-"));
+      const googleProvider = `google-xp-${crypto.randomUUID()}`;
+      const googleProfileId = `${googleProvider}:default`;
+
+      const store: AuthProfileStore = {
+        version: AUTH_STORE_VERSION,
+        profiles: {
+          [googleProfileId]: { type: "api_key", provider: googleProvider, key: "gkey" },
+        },
+        usageStats: {
+          // Simulate google:default already in cooldown from a prior 429
+          [googleProfileId]: { cooldownUntil: Date.now() + 5 * 60_000 },
+        },
+      };
+      saveAuthProfileStore(store, tempDir);
+
+      const cfg = makeCfg({
+        agents: {
+          defaults: {
+            model: {
+              primary: `${googleProvider}/gemini-3-pro-preview`,
+              // Same-provider fallback listed first, then cross-provider
+              fallbacks: [`${googleProvider}/gemini-2.5-flash`, "fallback-provider/ok-model"],
+            },
+          },
+        },
+      });
+
+      const run = vi.fn().mockImplementation(async (provider: string) => {
+        if (provider === "fallback-provider") {
+          return "cross-provider-ok";
+        }
+        throw new Error(`unexpected provider: ${provider}`);
+      });
+
+      try {
+        const result = await runWithModelFallback({
+          cfg,
+          provider: googleProvider,
+          model: "gemini-3-pro-preview",
+          agentDir: tempDir,
+          run,
+        });
+
+        expect(result.result).toBe("cross-provider-ok");
+        // Only the cross-provider fallback should have been called;
+        // both google candidates were pre-flight skipped due to cooldown.
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(run).toHaveBeenCalledWith("fallback-provider", "ok-model");
+
+        // Both google skips are recorded in attempts
+        const googleAttempts = result.attempts.filter((a) => a.provider === googleProvider);
+        expect(googleAttempts).toHaveLength(2);
+        expect(googleAttempts.every((a) => a.reason === "rate_limit")).toBe(true);
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("all models fail — error message count matches attempted models", async () => {
+      const cfg = makeCfg({
+        agents: {
+          defaults: {
+            model: {
+              primary: "google/gemini-3-pro-preview",
+              fallbacks: ["anthropic/claude-opus-4-6"],
+            },
+          },
+        },
+      });
+
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }))
+        .mockRejectedValueOnce(Object.assign(new Error("unauthorized"), { status: 401 }));
+
+      await expect(
+        runWithModelFallback({
+          cfg,
+          provider: "google",
+          model: "gemini-3-pro-preview",
+          run,
+        }),
+      ).rejects.toThrow(/All models failed \(2\)/);
+
+      expect(run).toHaveBeenCalledTimes(2);
+    });
   });
 });
