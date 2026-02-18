@@ -1,0 +1,15 @@
+feat(gateway): implement strictLoopback enforcement for Control UI
+
+Implements full enforcement logic for the strictLoopback config field:
+
+- Add isClientAllowedByLoopbackPolicy() helper to check IP restrictions
+- Reject non-loopback requests with 403 Forbidden when strictLoopback=true
+- Support IPv4 (127.0.0.1) and IPv6 (::1) loopback addresses
+- Respect x-forwarded-for headers when trusted proxies configured
+- Apply enforcement to both avatar and HTTP request handlers
+- Add comprehensive test coverage (5 test cases)
+- Pass trustedProxies config to handlers for accurate IP resolution
+- Update PR_BODY.md with correct description
+
+This addresses Greptile's review on PR #6590 that noted the config
+field had no actual implementation. Fixes #6590.

@@ -15,6 +15,8 @@ import {
   normalizeControlUiBasePath,
   resolveAssistantAvatarUrl,
 } from "./control-ui-shared.js";
+import { getHeader } from "./http-utils.js";
+import { isLoopbackAddress, resolveGatewayClientIp } from "./net.js";
 
 const ROOT_PREFIX = "/";
 
@@ -23,7 +25,31 @@ export type ControlUiRequestOptions = {
   config?: OpenClawConfig;
   agentId?: string;
   root?: ControlUiRootState;
+  trustedProxies?: string[];
 };
+
+/**
+ * Check if a request is allowed based on strictLoopback policy.
+ * Returns true if allowed, false if blocked.
+ */
+function isClientAllowedByLoopbackPolicy(
+  req: IncomingMessage,
+  trustedProxies: string[] | undefined,
+  strictLoopback: boolean | undefined,
+): boolean {
+  if (!strictLoopback) {
+    return true; // Policy disabled, allow all
+  }
+
+  const clientIp = resolveGatewayClientIp({
+    remoteAddr: req.socket?.remoteAddress ?? "",
+    forwardedFor: getHeader(req, "x-forwarded-for"),
+    realIp: getHeader(req, "x-real-ip"),
+    trustedProxies,
+  });
+
+  return isLoopbackAddress(clientIp);
+}
 
 export type ControlUiRootState =
   | { kind: "resolved"; path: string }
@@ -92,7 +118,12 @@ function isValidAgentId(agentId: string): boolean {
 export function handleControlUiAvatarRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  opts: { basePath?: string; resolveAvatar: (agentId: string) => ControlUiAvatarResolution },
+  opts: {
+    basePath?: string;
+    resolveAvatar: (agentId: string) => ControlUiAvatarResolution;
+    config?: OpenClawConfig;
+    trustedProxies?: string[];
+  },
 ): boolean {
   const urlRaw = req.url;
   if (!urlRaw) {
@@ -113,6 +144,15 @@ export function handleControlUiAvatarRequest(
   }
 
   applyControlUiSecurityHeaders(res);
+
+  // Check strictLoopback policy
+  const strictLoopback = opts.config?.gateway?.controlUi?.strictLoopback;
+  if (!isClientAllowedByLoopbackPolicy(req, opts.trustedProxies, strictLoopback)) {
+    res.statusCode = 403;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end("Forbidden: Access restricted to loopback addresses only");
+    return true;
+  }
 
   const agentIdParts = pathname.slice(pathWithBase.length).split("/").filter(Boolean);
   const agentId = agentIdParts[0] ?? "";
@@ -228,6 +268,15 @@ export function handleControlUiHttpRequest(
   }
 
   applyControlUiSecurityHeaders(res);
+
+  // Check strictLoopback policy early
+  const strictLoopback = opts?.config?.gateway?.controlUi?.strictLoopback;
+  if (!isClientAllowedByLoopbackPolicy(req, opts?.trustedProxies, strictLoopback)) {
+    res.statusCode = 403;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.end("Forbidden: Access restricted to loopback addresses only");
+    return true;
+  }
 
   const bootstrapConfigPath = basePath
     ? `${basePath}${CONTROL_UI_BOOTSTRAP_CONFIG_PATH}`

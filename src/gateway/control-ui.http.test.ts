@@ -125,4 +125,135 @@ describe("handleControlUiHttpRequest", () => {
       },
     });
   });
+
+  describe("strictLoopback enforcement", () => {
+    it("allows loopback requests when strictLoopback is enabled", async () => {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res, end } = makeMockHttpResponse();
+          const mockReq = {
+            url: "/",
+            method: "GET",
+            socket: { remoteAddress: "127.0.0.1" },
+            headers: {},
+          } as unknown as IncomingMessage;
+
+          const handled = handleControlUiHttpRequest(mockReq, res, {
+            root: { kind: "resolved", path: tmp },
+            config: {
+              agents: { defaults: { workspace: tmp } },
+              gateway: { controlUi: { strictLoopback: true } },
+            },
+          });
+          expect(handled).toBe(true);
+          // Should serve index.html, not reject with Forbidden
+          const firstCallArg = end.mock.calls[0]?.[0];
+          expect(firstCallArg).not.toContain("Forbidden");
+        },
+      });
+    });
+
+    it("blocks non-loopback requests when strictLoopback is enabled", async () => {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res, end } = makeMockHttpResponse();
+          const mockReq = {
+            url: "/",
+            method: "GET",
+            socket: { remoteAddress: "192.168.1.100" },
+            headers: {},
+          } as unknown as IncomingMessage;
+
+          const handled = handleControlUiHttpRequest(mockReq, res, {
+            root: { kind: "resolved", path: tmp },
+            config: {
+              agents: { defaults: { workspace: tmp } },
+              gateway: { controlUi: { strictLoopback: true } },
+            },
+            trustedProxies: [],
+          });
+          expect(handled).toBe(true);
+          expect(res.statusCode).toBe(403);
+          expect(end).toHaveBeenCalledWith("Forbidden: Access restricted to loopback addresses only");
+        },
+      });
+    });
+
+    it("allows non-loopback requests when strictLoopback is disabled", async () => {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res } = makeMockHttpResponse();
+          const mockReq = {
+            url: "/",
+            method: "GET",
+            socket: { remoteAddress: "192.168.1.100" },
+            headers: {},
+          } as unknown as IncomingMessage;
+
+          const handled = handleControlUiHttpRequest(mockReq, res, {
+            root: { kind: "resolved", path: tmp },
+            config: {
+              agents: { defaults: { workspace: tmp } },
+              gateway: { controlUi: { strictLoopback: false } },
+            },
+            trustedProxies: [],
+          });
+          expect(handled).toBe(true);
+          // Should not be rejected - status should not be 403
+          expect(res.statusCode).not.toBe(403);
+        },
+      });
+    });
+
+    it("allows IPv6 loopback (::1) when strictLoopback is enabled", async () => {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res } = makeMockHttpResponse();
+          const mockReq = {
+            url: "/",
+            method: "GET",
+            socket: { remoteAddress: "::1" },
+            headers: {},
+          } as unknown as IncomingMessage;
+
+          const handled = handleControlUiHttpRequest(mockReq, res, {
+            root: { kind: "resolved", path: tmp },
+            config: {
+              agents: { defaults: { workspace: tmp } },
+              gateway: { controlUi: { strictLoopback: true } },
+            },
+            trustedProxies: [],
+          });
+          expect(handled).toBe(true);
+          expect(res.statusCode).not.toBe(403);
+        },
+      });
+    });
+
+    it("respects x-forwarded-for header with trusted proxies", async () => {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res, end } = makeMockHttpResponse();
+          const mockReq = {
+            url: "/",
+            method: "GET",
+            socket: { remoteAddress: "10.0.0.1" }, // trusted proxy IP
+            headers: { "x-forwarded-for": "8.8.8.8" }, // non-loopback client
+          } as unknown as IncomingMessage;
+
+          const handled = handleControlUiHttpRequest(mockReq, res, {
+            root: { kind: "resolved", path: tmp },
+            config: {
+              agents: { defaults: { workspace: tmp } },
+              gateway: { controlUi: { strictLoopback: true } },
+            },
+            trustedProxies: ["10.0.0.1"],
+          });
+          expect(handled).toBe(true);
+          expect(res.statusCode).toBe(403); // Blocked because forwarded client is not loopback
+          expect(end).toHaveBeenCalledWith("Forbidden: Access restricted to loopback addresses only");
+        },
+      });
+    });
+  });
 });
