@@ -96,6 +96,7 @@ export type BuildTelegramMessageContextParams = {
   bot: Bot;
   cfg: OpenClawConfig;
   account: { accountId: string };
+  telegramCfg: { allowBots?: boolean };
   historyLimit: number;
   groupHistories: Map<string, HistoryEntry[]>;
   dmPolicy: DmPolicy;
@@ -136,6 +137,7 @@ export const buildTelegramMessageContext = async ({
   bot,
   cfg,
   account,
+  telegramCfg,
   historyLimit,
   groupHistories,
   dmPolicy,
@@ -236,6 +238,14 @@ export const buildTelegramMessageContext = async ({
     groupConfig?.requireMention,
     baseRequireMention,
   );
+
+  // Bot message filtering (parity with Discord/Slack)
+  const allowBots = groupConfig?.allowBots ?? telegramCfg.allowBots ?? false;
+  const isBotMessage = msg.from?.is_bot === true;
+  if (isGroup && isBotMessage && !allowBots) {
+    logVerbose(`telegram: drop bot message in group ${chatId} (allowBots=false)`);
+    return null;
+  }
 
   const sendTyping = async () => {
     await withTelegramApiErrorLogging({
