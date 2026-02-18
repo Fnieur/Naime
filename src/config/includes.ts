@@ -10,9 +10,9 @@
  * ```
  */
 
+import JSON5 from "json5";
 import fs from "node:fs";
 import path from "node:path";
-import JSON5 from "json5";
 import { isPlainObject } from "../utils.js";
 
 export const INCLUDE_KEY = "$include";
@@ -53,6 +53,8 @@ export class CircularIncludeError extends ConfigIncludeError {
 // Utilities
 // ============================================================================
 
+const BLOCKED_MERGE_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+
 /** Deep merge: arrays concatenate, objects merge recursively, primitives: source wins */
 export function deepMerge(target: unknown, source: unknown): unknown {
   if (Array.isArray(target) && Array.isArray(source)) {
@@ -61,6 +63,9 @@ export function deepMerge(target: unknown, source: unknown): unknown {
   if (isPlainObject(target) && isPlainObject(source)) {
     const result: Record<string, unknown> = { ...target };
     for (const key of Object.keys(source)) {
+      if (BLOCKED_MERGE_KEYS.has(key)) {
+        continue;
+      }
       result[key] = key in result ? deepMerge(result[key], source[key]) : source[key];
     }
     return result;
