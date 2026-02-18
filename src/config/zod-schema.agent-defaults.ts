@@ -9,6 +9,8 @@ import {
   BlockStreamingChunkSchema,
   BlockStreamingCoalesceSchema,
   CliBackendSchema,
+  ContextDecaySchema,
+  ContextLifecycleLogSchema,
   HumanDelaySchema,
 } from "./zod-schema.core.js";
 
@@ -88,6 +90,8 @@ export const AgentDefaultsSchema = z
       })
       .strict()
       .optional(),
+    contextDecay: ContextDecaySchema,
+    contextLifecycleLog: ContextLifecycleLogSchema,
     compaction: z
       .object({
         mode: z.union([z.literal("default"), z.literal("safeguard")]).optional(),

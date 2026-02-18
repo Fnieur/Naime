@@ -48,6 +48,29 @@ export type AgentContextPruningConfig = {
   };
 };
 
+export type ContextDecayConfig = {
+  /** Remove thinking blocks from assistant messages after N turns. */
+  stripThinkingAfterTurns?: number;
+  /** Replace tool results with LLM summary after N turns. */
+  summarizeToolResultsAfterTurns?: number;
+  /** Group-summarize a window of turns after N turns of age. */
+  summarizeWindowAfterTurns?: number;
+  /** Number of turns per group-summarization window (default: 4). */
+  summarizeWindowSize?: number;
+  /** Swap tool results to file after N turns (replaces content with file path + hint). */
+  swapToolResultsAfterTurns?: number;
+  /** Minimum tool result size in chars to qualify for file swap (default: 256). */
+  swapMinChars?: number;
+  /** Replace tool results with placeholder after N turns. */
+  stripToolResultsAfterTurns?: number;
+  /** Hard cap on total messages in context. */
+  maxContextMessages?: number;
+  /** Model ref for summarization (e.g., "haiku", "anthropic/claude-haiku-4-5"). */
+  summarizationModel?: string;
+  /** Model for group summaries (falls back to summarizationModel if unset). */
+  groupSummarizationModel?: string;
+};
+
 export type CliBackendConfig = {
   /** CLI command to execute (absolute path or on PATH). */
   command: string;
@@ -160,6 +183,10 @@ export type AgentDefaultsConfig = {
   cliBackends?: Record<string, CliBackendConfig>;
   /** Opt-in: prune old tool results from the LLM context to reduce token usage. */
   contextPruning?: AgentContextPruningConfig;
+  /** Context decay settings (strip thinking, summarize/strip tool results after N turns). */
+  contextDecay?: ContextDecayConfig;
+  /** Optional context lifecycle event logging (JSONL). */
+  contextLifecycleLog?: ContextLifecycleLogConfig;
   /** Compaction tuning and pre-compaction memory flush behavior. */
   compaction?: AgentCompactionConfig;
   /** Vector memory search configuration (per-agent overrides supported). */
@@ -282,6 +309,13 @@ export type AgentDefaultsConfig = {
     /** Auto-prune sandbox containers. */
     prune?: SandboxPruneSettings;
   };
+};
+
+export type ContextLifecycleLogConfig = {
+  /** Enable context lifecycle event logging. Default: false. */
+  enabled?: boolean;
+  /** Output file path (JSONL). Supports {sessionKey} placeholder. Default: 'logs/context-lifecycle.jsonl'. */
+  filePath?: string;
 };
 
 export type AgentCompactionMode = "default" | "safeguard";

@@ -19,7 +19,6 @@ import { resolveSignalReactionLevel } from "../../signal/reaction-level.js";
 import { resolveTelegramInlineButtonsScope } from "../../telegram/inline-buttons.js";
 import { resolveTelegramReactionLevel } from "../../telegram/reaction-level.js";
 import { buildTtsSystemPromptHint } from "../../tts/tts.js";
-import { resolveUserPath } from "../../utils.js";
 import { normalizeMessageChannel } from "../../utils/message-channel.js";
 import { isReasoningTagProvider } from "../../utils/provider-utils.js";
 import { resolveOpenClawAgentDir } from "../agent-paths.js";
@@ -59,11 +58,12 @@ import {
   type SkillSnapshot,
 } from "../skills.js";
 import { resolveTranscriptPolicy } from "../transcript-policy.js";
+import { resolveRunWorkspaceDir } from "../workspace-run.js";
 import {
   compactWithSafetyTimeout,
   EMBEDDED_COMPACTION_TIMEOUT_MS,
 } from "./compaction-safety-timeout.js";
-import { buildEmbeddedExtensionPaths } from "./extensions.js";
+import { buildEmbeddedExtensions } from "./extensions.js";
 import {
   logToolSchemasForGoogle,
   sanitizeSessionHistory,
@@ -253,7 +253,12 @@ export async function compactEmbeddedPiSessionDirect(
   const attempt = params.attempt ?? 1;
   const maxAttempts = params.maxAttempts ?? 1;
   const runId = params.runId ?? params.sessionId;
-  const resolvedWorkspace = resolveUserPath(params.workspaceDir);
+  const workspaceResolution = resolveRunWorkspaceDir({
+    workspaceDir: params.workspaceDir,
+    sessionKey: params.sessionKey,
+    config: params.config,
+  });
+  const resolvedWorkspace = workspaceResolution.workspaceDir;
   const prevCwd = process.cwd();
 
   const provider = (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
@@ -536,13 +541,16 @@ export async function compactEmbeddedPiSessionDirect(
         settingsManager,
         minReserveTokens: resolveCompactionReserveTokensFloor(params.config),
       });
-      // Call for side effects (sets compaction/pruning runtime state)
-      buildEmbeddedExtensionPaths({
+      // Call for side effects (sets compaction/pruning runtime state + lifecycle emitter).
+      // Context decay is not active during compaction (no sessionFile).
+      const { lifecycleEmitter } = buildEmbeddedExtensions({
         cfg: params.config,
         sessionManager,
         provider,
         modelId,
         model,
+        sessionKey: params.sessionKey,
+        sessionId: params.sessionId,
       });
 
       const { builtInTools, customTools } = splitSdkTools({
@@ -691,6 +699,22 @@ export async function compactEmbeddedPiSessionDirect(
               `delta.toolResultChars=${postMetrics.toolResultChars - preMetrics.toolResultChars} ` +
               `delta.estTokens=${typeof preMetrics.estTokens === "number" && typeof postMetrics.estTokens === "number" ? postMetrics.estTokens - preMetrics.estTokens : "unknown"}`,
           );
+        }
+        if (lifecycleEmitter) {
+          try {
+            const beforeTokens = result.tokensBefore;
+            lifecycleEmitter.emit({
+              turn: 0,
+              rule: "compact:compaction",
+              beforeTokens,
+              afterTokens: tokensAfter ?? beforeTokens,
+              freedTokens: tokensAfter != null ? Math.max(0, beforeTokens - tokensAfter) : 0,
+              details: { trigger, diagId, manual: true },
+            });
+            void lifecycleEmitter.dispose();
+          } catch (err) {
+            log.warn(`lifecycle emit failed: ${String(err)}`);
+          }
         }
         return {
           ok: true,
