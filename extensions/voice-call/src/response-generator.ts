@@ -64,10 +64,8 @@ export async function generateVoiceResponse(
   // Resolve paths
   const storePath = deps.resolveStorePath(cfg.session?.store, { agentId });
   const agentDir = deps.resolveAgentDir(cfg, agentId);
-  const workspaceDir = deps.resolveAgentWorkspaceDir(cfg, agentId);
-
-  // Ensure workspace exists
-  await deps.ensureAgentWorkspace({ dir: workspaceDir });
+  // Workspace not used for voice calls (too heavy, causes model compat issues)
+  const workspaceDir = null;
 
   // Load or create session entry
   const sessionStore = deps.loadSessionStore(storePath);
