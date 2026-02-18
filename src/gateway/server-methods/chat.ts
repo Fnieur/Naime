@@ -7,10 +7,22 @@ import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import type { MsgContext } from "../../auto-reply/templating.js";
+import { getChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
 import { createReplyPrefixOptions } from "../../channels/reply-prefix.js";
+import { createOutboundSendDeps } from "../../cli/deps.js";
 import { resolveSessionFilePath } from "../../config/sessions.js";
+import {
+  resolveAgentDeliveryPlan,
+  resolveAgentOutboundTarget,
+} from "../../infra/outbound/agent-delivery.js";
+import { deliverOutboundPayloads } from "../../infra/outbound/deliver.js";
+import { normalizeOutboundPayloads } from "../../infra/outbound/payloads.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
-import { INTERNAL_MESSAGE_CHANNEL } from "../../utils/message-channel.js";
+import {
+  INTERNAL_MESSAGE_CHANNEL,
+  isDeliverableMessageChannel,
+  isInternalMessageChannel,
+} from "../../utils/message-channel.js";
 import {
   abortChatRunById,
   abortChatRunsForSessionKey,
@@ -561,6 +573,78 @@ function broadcastChatError(params: {
   params.context.agentRunSeq.delete(params.runId);
 }
 
+function inferChannelFromTarget(to?: string): string | undefined {
+  if (!to || !to.includes(":")) {
+    return undefined;
+  }
+  const prefix = to.split(":")[0]?.toLowerCase();
+  return prefix && isDeliverableMessageChannel(prefix) ? prefix : undefined;
+}
+
+async function deliverChatReply(params: {
+  context: GatewayRequestContext;
+  sessionKey: string;
+  agentId?: string;
+  text: string;
+}) {
+  const { context, sessionKey, agentId, text } = params;
+  try {
+    const { cfg, entry } = loadSessionEntry(sessionKey);
+    const storedChannel = entry?.deliveryContext?.channel ?? entry?.origin?.provider;
+    const channel =
+      storedChannel && isDeliverableMessageChannel(storedChannel)
+        ? storedChannel
+        : inferChannelFromTarget(entry?.deliveryContext?.to ?? entry?.lastTo ?? entry?.origin?.to);
+    if (!channel) {
+      return;
+    }
+
+    const to = entry?.deliveryContext?.to ?? entry?.lastTo ?? entry?.origin?.to;
+    const accountId = entry?.deliveryContext?.accountId ?? entry?.lastAccountId;
+    const plan = resolveAgentDeliveryPlan({
+      sessionEntry: entry,
+      requestedChannel: channel,
+      explicitTo: to,
+      accountId,
+      wantsDelivery: true,
+    });
+
+    const deliveryChannel = plan.resolvedChannel;
+    if (isInternalMessageChannel(deliveryChannel)) {
+      return;
+    }
+
+    const plugin = getChannelPlugin(normalizeChannelId(deliveryChannel) ?? deliveryChannel);
+    if (!plugin) {
+      return;
+    }
+
+    const resolved = resolveAgentOutboundTarget({
+      cfg,
+      plan,
+      targetMode: plan.deliveryTargetMode ?? (plan.resolvedTo ? "explicit" : "implicit"),
+      validateExplicitTarget: true,
+    });
+    const target = resolved.resolvedTo ?? plan.resolvedTo;
+    if (!target || (resolved.resolvedTarget && !resolved.resolvedTarget.ok)) {
+      return;
+    }
+
+    await deliverOutboundPayloads({
+      cfg,
+      channel: deliveryChannel,
+      to: target,
+      accountId: plan.resolvedAccountId,
+      payloads: normalizeOutboundPayloads([{ text }]),
+      agentId,
+      bestEffort: true,
+      deps: context.deps ? createOutboundSendDeps(context.deps) : undefined,
+    });
+  } catch (err) {
+    context.logGateway.warn(`chat.send delivery failed: ${formatForLog(err)}`);
+  }
+}
+
 export const chatHandlers: GatewayRequestHandlers = {
   "chat.history": async ({ params, respond, context }) => {
     if (!validateChatHistoryParams(params)) {
@@ -921,13 +1005,14 @@ export const chatHandlers: GatewayRequestHandlers = {
           onModelSelected,
         },
       })
-        .then(() => {
+        .then(async () => {
+          const combinedReply = finalReplyParts
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .join("\n\n")
+            .trim();
+
           if (!agentRunStarted) {
-            const combinedReply = finalReplyParts
-              .map((part) => part.trim())
-              .filter(Boolean)
-              .join("\n\n")
-              .trim();
             let message: Record<string, unknown> | undefined;
             if (combinedReply) {
               const { storePath: latestStorePath, entry: latestEntry } =
@@ -966,6 +1051,11 @@ export const chatHandlers: GatewayRequestHandlers = {
               message,
             });
           }
+
+          if (p.deliver && combinedReply) {
+            await deliverChatReply({ context, sessionKey, agentId, text: combinedReply });
+          }
+
           context.dedupe.set(`chat:${clientRunId}`, {
             ts: Date.now(),
             ok: true,
