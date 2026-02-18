@@ -167,8 +167,27 @@ export type DiagnosticEventInput = DiagnosticEventPayload extends infer Event
     ? Omit<Event, "seq" | "ts">
     : never
   : never;
-let seq = 0;
-const listeners = new Set<(evt: DiagnosticEventPayload) => void>();
+// Use a globalThis singleton so the event bus is shared across bundle chunks.
+// Without this, Rolldown may compile this module into separate chunks for the
+// gateway and the plugin-SDK, each with its own `listeners` Set — meaning the
+// gateway emits events that no plugin ever receives.
+// This mirrors the pattern in plugins/runtime.ts (REGISTRY_STATE).
+const DIAGNOSTIC_BUS = Symbol.for("openclaw.diagnosticEventBus");
+
+type DiagnosticBusState = {
+  seq: number;
+  listeners: Set<(evt: DiagnosticEventPayload) => void>;
+};
+
+const bus: DiagnosticBusState = (() => {
+  const g = globalThis as typeof globalThis & {
+    [DIAGNOSTIC_BUS]?: DiagnosticBusState;
+  };
+  if (!g[DIAGNOSTIC_BUS]) {
+    g[DIAGNOSTIC_BUS] = { seq: 0, listeners: new Set() };
+  }
+  return g[DIAGNOSTIC_BUS];
+})();
 
 export function isDiagnosticsEnabled(config?: OpenClawConfig): boolean {
   return config?.diagnostics?.enabled === true;
@@ -177,10 +196,10 @@ export function isDiagnosticsEnabled(config?: OpenClawConfig): boolean {
 export function emitDiagnosticEvent(event: DiagnosticEventInput) {
   const enriched = {
     ...event,
-    seq: (seq += 1),
+    seq: (bus.seq += 1),
     ts: Date.now(),
   } satisfies DiagnosticEventPayload;
-  for (const listener of listeners) {
+  for (const listener of bus.listeners) {
     try {
       listener(enriched);
     } catch {
@@ -190,11 +209,11 @@ export function emitDiagnosticEvent(event: DiagnosticEventInput) {
 }
 
 export function onDiagnosticEvent(listener: (evt: DiagnosticEventPayload) => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  bus.listeners.add(listener);
+  return () => bus.listeners.delete(listener);
 }
 
 export function resetDiagnosticEventsForTest(): void {
-  seq = 0;
-  listeners.clear();
+  bus.seq = 0;
+  bus.listeners.clear();
 }
