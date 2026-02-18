@@ -286,6 +286,14 @@ const entries: SubCliEntry[] = [
       mod.registerCompletionCli(program);
     },
   },
+  {
+    name: "backup",
+    description: "Backup and restore",
+    register: async (program) => {
+      const mod = await import("../backup-cli.js");
+      mod.registerBackupCli(program);
+    },
+  },
 ];
 
 export function getSubCliEntries(): SubCliEntry[] {
