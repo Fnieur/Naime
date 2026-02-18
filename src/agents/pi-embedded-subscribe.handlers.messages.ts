@@ -188,8 +188,15 @@ export function handleMessageUpdate(
       });
       ctx.state.emittedAssistantUpdate = true;
       if (ctx.params.onPartialReply && ctx.state.shouldEmitPartialReplies) {
+        // Include previously finalized text from this turn (e.g. pre-tool text) so the
+        // partial update reflects the full assistant response so far.
+        // See: https://github.com/openclaw/openclaw/issues/19275
+        const previousText = ctx.state.assistantTexts
+          .slice(0, ctx.state.assistantTextBaseline)
+          .join("");
+        const fullText = previousText + cleanedText;
         void ctx.params.onPartialReply({
-          text: cleanedText,
+          text: fullText,
           mediaUrls: hasMedia ? mediaUrls : undefined,
         });
       }
