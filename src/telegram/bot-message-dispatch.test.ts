@@ -472,11 +472,22 @@ describe("dispatchTelegramMessage draft streaming", () => {
 
     // Should NOT edit preview message (which would overwrite the partial text)
     expect(editMessageTelegram).not.toHaveBeenCalled();
-    // Should deliver via normal path as a new message
-    expect(deliverReplies).toHaveBeenCalledWith(
-      expect.objectContaining({
-        replies: [expect.objectContaining({ text: expect.stringContaining("⚠️") })],
-      }),
-    );
+    // Telegram should not re-send the tool error summary now that we suppress it
+    expect(deliverReplies).not.toHaveBeenCalled();
+  });
+
+  it("skips redundant tool error summaries for Telegram", async () => {
+    dispatchReplyWithBufferedBlockDispatcher.mockImplementation(async ({ dispatcherOptions }) => {
+      await dispatcherOptions.deliver(
+        { text: "⚠️ 🛠️ Exec: cat /nonexistent failed: No such file", isError: true },
+        { kind: "final" },
+      );
+      return { queuedFinal: true };
+    });
+    deliverReplies.mockResolvedValue({ delivered: true });
+
+    await dispatchWithContext({ context: createContext() });
+
+    expect(deliverReplies).not.toHaveBeenCalled();
   });
 });
