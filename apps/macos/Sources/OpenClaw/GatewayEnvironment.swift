@@ -38,8 +38,10 @@ struct Semver: Comparable, CustomStringConvertible, Sendable {
     }
 
     func compatible(with required: Semver) -> Bool {
-        // Same major and not older than required.
-        self.major == required.major && self >= required
+        // OpenClaw uses calendar versioning (YYYY.M.D) exclusively.
+        // Same year = compatible. This is intentional: all releases within a
+        // calendar year maintain backward-compatible CLI/gateway protocols.
+        self.major == required.major
     }
 }
 

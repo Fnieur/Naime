@@ -17,6 +17,8 @@ Docs: https://docs.openclaw.ai
 - Slack: add native single-message text streaming with Slack `chat.startStream`/`appendStream`/`stopStream`; keep reply threading aligned with `replyToMode`, default streaming to enabled, and fall back to normal delivery when streaming fails. (#9972) Thanks @natedenh.
 - Slack: add configurable streaming modes for draft previews. (#18555) Thanks @Solvely-Colin.
 - Telegram/Agents: add inline button `style` support (`primary|success|danger`) across message tool schema, Telegram action parsing, send pipeline, and runtime prompt guidance. (#18241) Thanks @obviyus.
+- macOS: add in-app CLI + gateway install page to onboarding — installs the standalone CLI (`~/.openclaw`), starts the gateway via launchd, and auto-selects "This Mac" connection mode. Includes a "Reset Installation" button for troubleshooting broken installs.
+- macOS: add `--reset-onboarding` and `--full-reset` flags to `scripts/restart-mac.sh` for dev quick-iteration on onboarding flow.
 - Telegram: surface user message reactions as system events, with configurable `channels.telegram.reactionNotifications` scope. (#10075) Thanks @Glucksberg.
 - iMessage: support `replyToId` on outbound text/media sends and normalize leading `[[reply_to:<id>]]` tags so replies target the intended iMessage. Thanks @tyler6204.
 - Tool Display/Web UI: add intent-first tool detail views and exec summaries. (#18592) Thanks @xdLawless2.
@@ -158,6 +160,17 @@ Docs: https://docs.openclaw.ai
 - Agents/Failover: classify provider abort stop-reason errors (`Unhandled stop reason: abort`, `stop reason: abort`, `reason: abort`) as timeout-class failures so configured model fallback chains trigger instead of surfacing raw abort failures. (#18618) Thanks @sauerdaniel.
 - Models/CLI: sync auth-profiles credentials into agent `auth.json` before registry availability checks so `openclaw models list --all` reports auth correctly for API-key/token providers, normalize provider-id aliases when bridging credentials, and skip expired token mirrors. (#18610, #18615)
 - Agents/Context: raise default total bootstrap prompt cap from `24000` to `150000` chars (keeping `bootstrapMaxChars` at `20000`), include total-cap visibility in `/context`, and mark truncation from injected-vs-raw sizes so total-cap clipping is reflected accurately.
+- OpenClawKit/iOS ChatUI: accept canonical session-key completion events for local pending runs and preserve message IDs across history refreshes, preventing stuck "thinking" state and message flicker after gateway replies. (#18165) Thanks @mbelinky.
+- iOS/Talk: harden mobile talk config handling by ignoring redacted/env-placeholder API keys, support secure local keychain override, improve accessibility motion/contrast behavior in status UI, and tighten ATS to local-network allowance. (#18163) Thanks @mbelinky.
+- iOS/Gateway: stabilize connect/discovery state handling, add onboarding reset recovery in Settings, and fix iOS gateway-controller coverage for command-surface and last-connection persistence behavior. (#18164) Thanks @mbelinky.
+- iOS/Onboarding: add QR-first onboarding wizard with setup-code deep link support, pairing/auth issue guidance, and device-pair QR generation improvements for Telegram/Web/TUI fallback flows. (#18162) Thanks @mbelinky and @Marvae.
+- iOS/Location: restore the significant location monitor implementation (service hooks + protocol surface + ATS key alignment) after merge drift so iOS builds compile again. (#18260) Thanks @ngutman.
+- macOS: fix gateway startup getting stuck during onboarding by removing async subprocess calls (`lsof`) from the polling loop that competed with `@MainActor` process manager tasks, and handle "failed but listener present" state as success for post-reset auth-pending scenarios.
+- macOS: preserve `gateway.mode` in config when connection mode is unconfigured, preventing post-reset gateway startup failures.
+- macOS: use calendar versioning (same year = compatible) for gateway version compatibility checks.
+- macOS: auto-clear stale `disable-launchagent` marker when the app is properly code-signed, preventing gateway from failing to start after upgrading from unsigned dev builds.
+- macOS: prefer standalone `openclaw` binary over `pnpm` in command resolution to avoid triggering workspace rebuilds when CLI was installed via `install-cli.sh`.
+- macOS: filter shell profile noise from CLI install error messages to show actionable errors.
 - Memory/QMD: scope managed collection names per agent and precreate glob-backed collection directories before registration, preventing cross-agent collection clobbering and startup ENOENT failures in fresh workspaces. (#17194) Thanks @jonathanadams96.
 - Cron: preserve per-job schedule-error isolation in post-run maintenance recompute so malformed sibling jobs no longer abort persistence of successful runs. (#17852) Thanks @pierreeurope.
 - Gateway/Config: prevent `config.patch` object-array merges from falling back to full-array replacement when some patch entries lack `id`, so partial `agents.list` updates no longer drop unrelated agents. (#17989) Thanks @stakeswky.
