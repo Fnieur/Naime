@@ -715,6 +715,8 @@ Primary reference:
   - `channels.telegram.groups.<id>.topics.<threadId>.*`: per-topic overrides (same fields as group).
   - `channels.telegram.groups.<id>.topics.<threadId>.groupPolicy`: per-topic override for groupPolicy (`open | allowlist | disabled`).
   - `channels.telegram.groups.<id>.topics.<threadId>.requireMention`: per-topic mention gating override.
+  - `channels.telegram.groups.<id>.tools`: per-group tool policy override (`allow`, `alsoAllow`, `deny`).
+  - `channels.telegram.groups.<id>.toolsBySender.<senderId>`: per-sender tool policy override within a group (`allow`, `alsoAllow`, `deny`).
 - `channels.telegram.capabilities.inlineButtons`: `off | dm | group | all | allowlist` (default: allowlist).
 - `channels.telegram.accounts.<account>.capabilities.inlineButtons`: per-account override.
 - `channels.telegram.replyToMode`: `off | first | all` (default: `off`).
@@ -722,6 +724,9 @@ Primary reference:
 - `channels.telegram.chunkMode`: `length` (default) or `newline` to split on blank lines (paragraph boundaries) before length chunking.
 - `channels.telegram.linkPreview`: toggle link previews for outbound messages (default: true).
 - `channels.telegram.streamMode`: `off | partial | block` (live stream preview).
+- `channels.telegram.blockStreaming`: when `true`, suppresses live stream previews for this channel regardless of `streamMode`.
+- `channels.telegram.markdown.tables`: `off | bullets | code` — controls how markdown tables are rendered in outbound messages.
+- `channels.telegram.accounts.<account>.name`: optional display name for the account (used in CLI/UI lists).
 - `channels.telegram.mediaMaxMb`: inbound/outbound media cap (MB).
 - `channels.telegram.retry`: retry policy for outbound Telegram API calls (attempts, minDelayMs, maxDelayMs, jitter).
 - `channels.telegram.network.autoSelectFamily`: override Node autoSelectFamily (true=enable, false=disable). Defaults to disabled on Node 22 to avoid Happy Eyeballs timeouts.
@@ -732,6 +737,7 @@ Primary reference:
 - `channels.telegram.webhookHost`: local webhook bind host (default `127.0.0.1`).
 - `channels.telegram.actions.reactions`: gate Telegram tool reactions.
 - `channels.telegram.actions.sendMessage`: gate Telegram tool message sends.
+- `channels.telegram.actions.editMessage`: gate Telegram tool message edits.
 - `channels.telegram.actions.deleteMessage`: gate Telegram tool message deletes.
 - `channels.telegram.actions.sticker`: gate Telegram sticker actions — send and search (default: false).
 - `channels.telegram.reactionNotifications`: `off | own | all` — control which reactions trigger system events (default: `own` when not set).
