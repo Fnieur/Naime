@@ -4,7 +4,7 @@ import path from "node:path";
 import type { ButtonInteraction, ComponentData } from "@buape/carbon";
 import { Routes } from "discord-api-types/v10";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearSessionStoreCacheForTest } from "../../config/sessions.js";
+import { clearSessionStoreCacheForTest } from "../../config/sessions/store.js";
 import type { DiscordExecApprovalConfig } from "../../config/types.discord.js";
 import {
   buildExecApprovalCustomId,
@@ -25,6 +25,7 @@ const writeStore = (store: Record<string, unknown>) => {
 };
 
 beforeEach(() => {
+  clearSessionStoreCacheForTest();
   writeStore({});
 });
 
