@@ -315,6 +315,7 @@ export const telegramPlugin: ChannelPlugin<ResolvedTelegramAccount, TelegramProb
         account.token,
         timeoutMs,
         account.config.proxy,
+        account.apiRoot,
       ),
     auditAccount: async ({ account, timeoutMs, probe, cfg }) => {
       const groups =
@@ -342,6 +343,7 @@ export const telegramPlugin: ChannelPlugin<ResolvedTelegramAccount, TelegramProb
         groupIds,
         proxyUrl: account.config.proxy,
         timeoutMs,
+        apiRoot: account.apiRoot,
       });
       return { ...audit, unresolvedGroups, hasWildcardUnmentionedGroups };
     },
@@ -384,6 +386,7 @@ export const telegramPlugin: ChannelPlugin<ResolvedTelegramAccount, TelegramProb
           token,
           2500,
           account.config.proxy,
+          account.apiRoot,
         );
         const username = probe.ok ? probe.bot?.username?.trim() : null;
         if (username) {
@@ -396,6 +399,7 @@ export const telegramPlugin: ChannelPlugin<ResolvedTelegramAccount, TelegramProb
       }
       ctx.log?.info(`[${account.accountId}] starting provider${telegramBotLabel}`);
       return getTelegramRuntime().channel.telegram.monitorTelegramProvider({
+        // apiRoot is resolved internally via resolveTelegramAccount from config
         token,
         accountId: account.accountId,
         config: ctx.cfg,
