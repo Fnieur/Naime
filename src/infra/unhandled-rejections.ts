@@ -140,6 +140,87 @@ export function isUnhandledRejectionHandled(reason: unknown): boolean {
   return false;
 }
 
+/**
+ * Detects the known undici TLS session resumption bug where `TLSSocket.setSession`
+ * is called after the socket handle has been destroyed, causing a synchronous
+ * TypeError that bypasses all try/catch and Promise rejection handlers.
+ *
+ * This is a race condition in undici's connection pool: when a TLS socket closes,
+ * undici immediately tries to reconnect in the same tick via `_resume()`. During
+ * `tls.connect()`, it passes a cached session to the new socket, but the internal
+ * `_handle` is already null — causing `this._handle.setSession(session)` to throw.
+ *
+ * The error is safe to suppress because:
+ * - The socket was already closing (no in-flight data is lost)
+ * - undici will create a fresh connection on the next request
+ * - No application state is corrupted
+ *
+ * Tracked upstream:
+ * - https://github.com/nodejs/undici/issues/3869
+ * - https://github.com/openclaw/openclaw/issues/16206
+ *
+ * @see https://github.com/nodejs/node/blob/main/lib/_tls_wrap.js (TLSSocket.setSession)
+ */
+export function isUndiciTlsSessionBug(err: unknown): boolean {
+  if (!(err instanceof TypeError)) {
+    return false;
+  }
+
+  const message = err.message || "";
+  if (!message.includes("reading 'setSession'")) {
+    return false;
+  }
+
+  const stack = err.stack || "";
+  return stack.includes("TLSSocket.setSession") && stack.includes("undici");
+}
+
+/**
+ * The handler function reference, used for deregistration in tests.
+ * @internal Exported for test cleanup only.
+ */
+export let _uncaughtExceptionHandler: ((error: Error) => void) | null = null;
+
+/**
+ * Installs a global `uncaughtException` handler that suppresses known transient
+ * errors (like the undici TLS session bug) instead of crashing the process.
+ *
+ * Unknown exceptions still trigger `process.exit(1)` to preserve crash semantics
+ * for genuinely unexpected errors.
+ *
+ * Safe to call multiple times — only the first call registers a listener.
+ *
+ * @returns A cleanup function that removes the listener (primarily for tests).
+ */
+export function installUncaughtExceptionHandler(): () => void {
+  if (_uncaughtExceptionHandler) {
+    return () => {
+      /* already installed, no-op cleanup */
+    };
+  }
+
+  const handler = (error: Error): void => {
+    if (isUndiciTlsSessionBug(error)) {
+      console.warn(
+        "[openclaw] Suppressed undici TLS session bug (non-fatal):",
+        formatUncaughtError(error),
+      );
+      return;
+    }
+
+    console.error("[openclaw] Uncaught exception:", formatUncaughtError(error));
+    process.exit(1);
+  };
+
+  _uncaughtExceptionHandler = handler;
+  process.on("uncaughtException", handler);
+
+  return () => {
+    process.removeListener("uncaughtException", handler);
+    _uncaughtExceptionHandler = null;
+  };
+}
+
 export function installUnhandledRejectionHandler(): void {
   process.on("unhandledRejection", (reason, _promise) => {
     if (isUnhandledRejectionHandled(reason)) {

@@ -57,18 +57,14 @@ async function main() {
 
   const { assertSupportedRuntime } = await import("../infra/runtime-guard.js");
   assertSupportedRuntime();
-  const { formatUncaughtError } = await import("../infra/errors.js");
-  const { installUnhandledRejectionHandler } = await import("../infra/unhandled-rejections.js");
+  const { installUncaughtExceptionHandler, installUnhandledRejectionHandler } =
+    await import("../infra/unhandled-rejections.js");
 
   const { buildProgram } = await import("../cli/program.js");
   const program = buildProgram();
 
   installUnhandledRejectionHandler();
-
-  process.on("uncaughtException", (error) => {
-    console.error("[openclaw] Uncaught exception:", formatUncaughtError(error));
-    process.exit(1);
-  });
+  installUncaughtExceptionHandler();
 
   await program.parseAsync(process.argv);
 }
