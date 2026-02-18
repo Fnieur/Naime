@@ -436,6 +436,46 @@ describe("security audit", () => {
     expect(finding?.detail).toContain("sandbox=all");
   });
 
+  it("does not flag large MoE models as small", async () => {
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { model: { primary: "ollama/Qwen3-235B-A22B-Instruct" } } },
+      tools: {
+        web: {
+          search: { enabled: true },
+          fetch: { enabled: true },
+        },
+      },
+      browser: { enabled: true },
+    };
+
+    const res = await runSecurityAudit({
+      config: cfg,
+      includeFilesystem: false,
+      includeChannelSecurity: false,
+    });
+
+    const finding = res.findings.find((f) => f.checkId === "models.small_params");
+    expect(finding).toBeUndefined();
+  });
+
+  it("still flags small MoE models", async () => {
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { model: { primary: "ollama/some-model-3B-A1B" } } },
+      tools: {
+        web: { search: { enabled: true } },
+      },
+    };
+
+    const res = await runSecurityAudit({
+      config: cfg,
+      includeFilesystem: false,
+      includeChannelSecurity: false,
+    });
+
+    const finding = res.findings.find((f) => f.checkId === "models.small_params");
+    expect(finding).toBeDefined();
+  });
+
   it("flags sandbox docker config when sandbox mode is off", async () => {
     const cfg: OpenClawConfig = {
       agents: {
@@ -1424,6 +1464,28 @@ describe("security audit", () => {
     );
   });
 
+  it("downgrades hook sessionKey override to info when prefix constraints are set", async () => {
+    const cfg: OpenClawConfig = {
+      hooks: {
+        enabled: true,
+        token: "shared-gateway-token-1234567890",
+        defaultSessionKey: "hook:ingress",
+        allowRequestSessionKey: true,
+        allowedSessionKeyPrefixes: ["hook:"],
+      },
+    };
+
+    const res = await runSecurityAudit({
+      config: cfg,
+      includeFilesystem: false,
+      includeChannelSecurity: false,
+    });
+
+    const finding = res.findings.find((f) => f.checkId === "hooks.request_session_key_enabled");
+    expect(finding).toBeDefined();
+    expect(finding?.severity).toBe("info");
+  });
+
   it("reports HTTP API session-key override surfaces when enabled", async () => {
     const cfg: OpenClawConfig = {
       gateway: {
@@ -2163,6 +2225,87 @@ description: test skill
       });
 
       expect(capturedAuth?.token).toBe("fallback-local-token");
+    });
+  });
+
+  describe("security.acknowledged suppression", () => {
+    it("filters findings whose checkId is in security.acknowledged", async () => {
+      const cfg: OpenClawConfig = {
+        channels: { whatsapp: { groupPolicy: "open" }, telegram: { groupPolicy: "allowlist" } },
+        tools: { elevated: { enabled: true, allowFrom: { whatsapp: ["+1"] } } },
+        hooks: { enabled: true },
+        browser: { enabled: true },
+      };
+
+      // Run without acknowledged to discover a checkId
+      const baseline = await runSecurityAudit({
+        config: cfg,
+        includeFilesystem: false,
+        includeChannelSecurity: false,
+      });
+      expect(baseline.findings.length).toBeGreaterThan(0);
+      const targetId = baseline.findings[0].checkId;
+
+      // Run with that checkId acknowledged
+      const suppressed = await runSecurityAudit({
+        config: { ...cfg, security: { acknowledged: [targetId] } },
+        includeFilesystem: false,
+        includeChannelSecurity: false,
+      });
+
+      expect(suppressed.findings.some((f) => f.checkId === targetId)).toBe(false);
+      expect(suppressed.findings.length).toBe(baseline.findings.length - 1);
+    });
+
+    it("excludes acknowledged findings from summary counts", async () => {
+      const cfg: OpenClawConfig = {
+        channels: { whatsapp: { groupPolicy: "open" } },
+        tools: { elevated: { enabled: true, allowFrom: { whatsapp: ["+1"] } } },
+        hooks: { enabled: true },
+        browser: { enabled: true },
+      };
+
+      const baseline = await runSecurityAudit({
+        config: cfg,
+        includeFilesystem: false,
+        includeChannelSecurity: false,
+      });
+
+      const allIds = baseline.findings.map((f) => f.checkId);
+      const allSuppressed = await runSecurityAudit({
+        config: { ...cfg, security: { acknowledged: allIds } },
+        includeFilesystem: false,
+        includeChannelSecurity: false,
+      });
+
+      expect(allSuppressed.findings).toHaveLength(0);
+      expect(allSuppressed.summary.critical).toBe(0);
+      expect(allSuppressed.summary.warn).toBe(0);
+      expect(allSuppressed.summary.info).toBe(0);
+    });
+
+    it("does not filter anything when security.acknowledged is absent", async () => {
+      const cfg: OpenClawConfig = {
+        channels: { whatsapp: { groupPolicy: "open" } },
+        hooks: { enabled: true },
+      };
+
+      const withoutField = await runSecurityAudit({
+        config: cfg,
+        includeFilesystem: false,
+        includeChannelSecurity: false,
+      });
+
+      const withEmptyField = await runSecurityAudit({
+        config: { ...cfg, security: { acknowledged: [] } },
+        includeFilesystem: false,
+        includeChannelSecurity: false,
+      });
+
+      expect(withoutField.findings.length).toBe(withEmptyField.findings.length);
+      expect(withoutField.findings.map((f) => f.checkId)).toEqual(
+        withEmptyField.findings.map((f) => f.checkId),
+      );
     });
   });
 });

@@ -17,7 +17,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { AgentToolsConfig } from "../config/types.tools.js";
 import { resolveGatewayAuth } from "../gateway/auth.js";
 import { resolveNodeCommandAllowlist } from "../gateway/node-command-policy.js";
-import { inferParamBFromIdOrName } from "../shared/model-param-b.js";
+import { inferMoEActiveParamB, inferParamBFromIdOrName } from "../shared/model-param-b.js";
 import { pickSandboxToolPolicy } from "./audit-tool-policy.js";
 
 export type SecurityAuditFinding = {
@@ -482,14 +482,19 @@ export function collectHooksHardeningFindings(
   }
 
   if (allowRequestSessionKey) {
+    const hasPrefixConstraints = allowedPrefixes.length > 0;
     findings.push({
       checkId: "hooks.request_session_key_enabled",
-      severity: remoteExposure ? "critical" : "warn",
-      title: "External hook payloads may override sessionKey",
-      detail:
-        "hooks.allowRequestSessionKey=true allows `/hooks/agent` callers to choose the session key. Treat hook token holders as full-trust unless you also restrict prefixes.",
-      remediation:
-        "Set hooks.allowRequestSessionKey=false (recommended) or constrain hooks.allowedSessionKeyPrefixes.",
+      severity: hasPrefixConstraints ? "info" : remoteExposure ? "critical" : "warn",
+      title: hasPrefixConstraints
+        ? "Hook sessionKey override is prefix-constrained"
+        : "External hook payloads may override sessionKey",
+      detail: hasPrefixConstraints
+        ? `hooks.allowRequestSessionKey=true with prefix constraints [${allowedPrefixes.join(", ")}]. Session key override is scoped.`
+        : "hooks.allowRequestSessionKey=true allows `/hooks/agent` callers to choose the session key. Treat hook token holders as full-trust unless you also restrict prefixes.",
+      remediation: hasPrefixConstraints
+        ? undefined
+        : "Set hooks.allowRequestSessionKey=false (recommended) or constrain hooks.allowedSessionKeyPrefixes.",
     });
   }
 
@@ -867,6 +872,12 @@ export function collectSmallModelRiskFindings(params: {
     .map((entry) => {
       const paramB = inferParamBFromIdOrName(entry.id);
       if (!paramB || paramB > SMALL_MODEL_PARAM_B_MAX) {
+        return null;
+      }
+      // MoE models with large total params (e.g. Qwen3-235B-A22B) are
+      // frontier-class and should not be flagged as "small".
+      const moeActive = inferMoEActiveParamB(entry.id);
+      if (moeActive && paramB > SMALL_MODEL_PARAM_B_MAX / 3) {
         return null;
       }
       return { ...entry, paramB };

@@ -560,6 +560,10 @@ export const OpenClawSchema = z
       .strict()
       .optional(),
     memory: MemorySchema,
+    security: z
+      .object({ acknowledged: z.array(z.string()).optional() })
+      .strict()
+      .optional(),
     skills: z
       .object({
         allowBundled: z.array(z.string()).optional(),

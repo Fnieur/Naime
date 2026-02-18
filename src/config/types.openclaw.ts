@@ -97,6 +97,7 @@ export type OpenClawConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
+  security?: { acknowledged?: string[] };
 };
 
 export type ConfigValidationIssue = {
