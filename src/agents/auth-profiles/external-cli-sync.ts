@@ -1,6 +1,7 @@
 import {
   readQwenCliCredentialsCached,
   readMiniMaxCliCredentialsCached,
+  readClaudeCliCredentialsCached,
 } from "../cli-credentials.js";
 import {
   EXTERNAL_CLI_NEAR_EXPIRY_MS,
@@ -37,7 +38,11 @@ function isExternalProfileFresh(cred: AuthProfileCredential | undefined, now: nu
   if (cred.type !== "oauth" && cred.type !== "token") {
     return false;
   }
-  if (cred.provider !== "qwen-portal" && cred.provider !== "minimax-portal") {
+  if (
+    cred.provider !== "qwen-portal" &&
+    cred.provider !== "minimax-portal" &&
+    cred.provider !== "anthropic"
+  ) {
     return false;
   }
   if (typeof cred.expires !== "number") {
@@ -125,6 +130,28 @@ export function syncExternalCliCredentials(store: AuthProfileStore): boolean {
       MINIMAX_CLI_PROFILE_ID,
       "minimax-portal",
       () => readMiniMaxCliCredentialsCached({ ttlMs: EXTERNAL_CLI_SYNC_TTL_MS }),
+      now,
+    )
+  ) {
+    mutated = true;
+  }
+
+  // Sync anthropic:default only when the profile is already oauth.
+  // Never auto-convert api_key/token profiles to oauth.
+  const anthropicDefaultProfileId = "anthropic:default";
+  const existingAnthropicDefault = store.profiles[anthropicDefaultProfileId];
+  if (
+    existingAnthropicDefault &&
+    existingAnthropicDefault.provider === "anthropic" &&
+    existingAnthropicDefault.type === "oauth" &&
+    syncExternalCliCredentialsForProvider(
+      store,
+      anthropicDefaultProfileId,
+      "anthropic",
+      () => {
+        const cred = readClaudeCliCredentialsCached({ ttlMs: EXTERNAL_CLI_SYNC_TTL_MS });
+        return cred?.type === "oauth" ? cred : null;
+      },
       now,
     )
   ) {
