@@ -6,11 +6,13 @@ import {
   parseLaunchctlPrint,
   repairLaunchAgentBootstrap,
   resolveLaunchAgentPlistPath,
+  startLaunchAgent,
 } from "./launchd.js";
 
 const state = vi.hoisted(() => ({
   launchctlCalls: [] as string[][],
   listOutput: "",
+  printLoaded: true,
   dirs: new Set<string>(),
   files: new Map<string, string>(),
 }));
@@ -30,6 +32,16 @@ vi.mock("./exec-file.js", () => ({
   execFileUtf8: vi.fn(async (file: string, args: string[]) => {
     const call = normalizeLaunchctlArgs(file, args);
     state.launchctlCalls.push(call);
+    if (call[0] === "print") {
+      if (state.printLoaded) {
+        return { stdout: "state = running\npid = 123\n", stderr: "", code: 0 };
+      }
+      return {
+        stdout: "",
+        stderr: "Could not find service",
+        code: 113,
+      };
+    }
     if (call[0] === "list") {
       return { stdout: state.listOutput, stderr: "", code: 0 };
     }
@@ -66,6 +78,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 beforeEach(() => {
   state.launchctlCalls.length = 0;
   state.listOutput = "";
+  state.printLoaded = true;
   state.dirs.clear();
   state.files.clear();
   vi.clearAllMocks();
@@ -118,6 +131,26 @@ describe("launchd bootstrap repair", () => {
     const domain = typeof process.getuid === "function" ? `gui/${process.getuid()}` : "gui/501";
     const label = "ai.openclaw.gateway";
     const plistPath = resolveLaunchAgentPlistPath(env);
+
+    expect(state.launchctlCalls).toContainEqual(["bootstrap", domain, plistPath]);
+    expect(state.launchctlCalls).toContainEqual(["kickstart", "-k", `${domain}/${label}`]);
+  });
+});
+
+describe("launchd start", () => {
+  it("bootstraps and kickstarts when service is unloaded but plist exists", async () => {
+    const env: Record<string, string | undefined> = {
+      HOME: "/Users/test",
+      OPENCLAW_PROFILE: "default",
+    };
+    const plistPath = resolveLaunchAgentPlistPath(env);
+    state.files.set(plistPath, "plist");
+    state.printLoaded = false;
+
+    await startLaunchAgent({ env, stdout: new PassThrough() });
+
+    const domain = typeof process.getuid === "function" ? `gui/${process.getuid()}` : "gui/501";
+    const label = "ai.openclaw.gateway";
 
     expect(state.launchctlCalls).toContainEqual(["bootstrap", domain, plistPath]);
     expect(state.launchctlCalls).toContainEqual(["kickstart", "-k", `${domain}/${label}`]);

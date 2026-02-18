@@ -69,12 +69,11 @@ function normalizeUrl(raw: string, schemeFallback: "ws" | "wss"): string | null 
     if (resolvedScheme !== "ws" && resolvedScheme !== "wss") {
       return null;
     }
-    const host = parsed.hostname;
+    const host = parsed.host;
     if (!host) {
       return null;
     }
-    const port = parsed.port ? `:${parsed.port}` : "";
-    return `${resolvedScheme}://${host}${port}`;
+    return `${resolvedScheme}://${host}`;
   } catch {
     // Fall through to host:port parsing.
   }

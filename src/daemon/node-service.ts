@@ -57,6 +57,9 @@ export function resolveNodeService(): GatewayService {
     restart: async (args) => {
       return base.restart({ ...args, env: withNodeServiceEnv(args.env ?? {}) });
     },
+    start: async (args) => {
+      return base.start({ ...args, env: withNodeServiceEnv(args.env ?? {}) });
+    },
     isLoaded: async (args) => {
       return base.isLoaded({ env: withNodeServiceEnv(args.env ?? {}) });
     },

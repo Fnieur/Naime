@@ -4,6 +4,7 @@ import {
   readLaunchAgentProgramArguments,
   readLaunchAgentRuntime,
   restartLaunchAgent,
+  startLaunchAgent,
   stopLaunchAgent,
   uninstallLaunchAgent,
 } from "./launchd.js";
@@ -53,6 +54,10 @@ export type GatewayService = {
     env?: Record<string, string | undefined>;
     stdout: NodeJS.WritableStream;
   }) => Promise<void>;
+  start: (args: {
+    env?: Record<string, string | undefined>;
+    stdout: NodeJS.WritableStream;
+  }) => Promise<void>;
   isLoaded: (args: { env?: Record<string, string | undefined> }) => Promise<boolean>;
   readCommand: (env: Record<string, string | undefined>) => Promise<{
     programArguments: string[];
@@ -87,6 +92,12 @@ export function resolveGatewayService(): GatewayService {
           env: args.env,
         });
       },
+      start: async (args) => {
+        await startLaunchAgent({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
       isLoaded: async (args) => isLaunchAgentLoaded(args),
       readCommand: readLaunchAgentProgramArguments,
       readRuntime: readLaunchAgentRuntime,
@@ -116,6 +127,12 @@ export function resolveGatewayService(): GatewayService {
           env: args.env,
         });
       },
+      start: async (args) => {
+        await restartSystemdService({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
       isLoaded: async (args) => isSystemdServiceEnabled(args),
       readCommand: readSystemdServiceExecStart,
       readRuntime: async (env) => await readSystemdServiceRuntime(env),
@@ -140,6 +157,12 @@ export function resolveGatewayService(): GatewayService {
         });
       },
       restart: async (args) => {
+        await restartScheduledTask({
+          stdout: args.stdout,
+          env: args.env,
+        });
+      },
+      start: async (args) => {
         await restartScheduledTask({
           stdout: args.stdout,
           env: args.env,

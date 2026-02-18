@@ -13,7 +13,7 @@ public struct GatewayConnectDeepLink: Codable, Sendable, Equatable {
     public let password: String?
 
     public init(host: String, port: Int, tls: Bool, token: String?, password: String?) {
-        self.host = host
+        self.host = Self.normalizeStoredHost(host)
         self.port = port
         self.tls = tls
         self.token = token
@@ -21,8 +21,11 @@ public struct GatewayConnectDeepLink: Codable, Sendable, Equatable {
     }
 
     public var websocketURL: URL? {
-        let scheme = self.tls ? "wss" : "ws"
-        return URL(string: "\(scheme)://\(self.host):\(self.port)")
+        var components = URLComponents()
+        components.scheme = self.tls ? "wss" : "ws"
+        components.host = Self.hostForWebsocketURL(self.host)
+        components.port = self.port
+        return components.url
     }
 
     /// Parse a device-pair setup code (base64url-encoded JSON: `{url, token?, password?}`).
@@ -51,6 +54,22 @@ public struct GatewayConnectDeepLink: Codable, Sendable, Equatable {
             base64.append(contentsOf: String(repeating: "=", count: 4 - remainder))
         }
         return Data(base64Encoded: base64)
+    }
+
+    private static func normalizeStoredHost(_ host: String) -> String {
+        let trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") && trimmed.count > 2 {
+            return String(trimmed.dropFirst().dropLast())
+        }
+        return trimmed
+    }
+
+    private static func hostForWebsocketURL(_ host: String) -> String {
+        let normalized = Self.normalizeStoredHost(host)
+        if normalized.contains(":") {
+            return "[\(normalized)]"
+        }
+        return normalized
     }
 }
 

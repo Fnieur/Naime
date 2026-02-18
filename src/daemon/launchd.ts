@@ -434,3 +434,41 @@ export async function restartLaunchAgent({
     }
   }
 }
+
+export async function startLaunchAgent({
+  stdout,
+  env,
+}: {
+  stdout: NodeJS.WritableStream;
+  env?: Record<string, string | undefined>;
+}): Promise<void> {
+  const resolvedEnv = env ?? (process.env as Record<string, string | undefined>);
+  const domain = resolveGuiDomain();
+  const label = resolveLaunchAgentLabel({ env: resolvedEnv });
+  const target = `${domain}/${label}`;
+
+  const loaded = await isLaunchAgentLoaded({ env: resolvedEnv });
+  if (loaded) {
+    await restartLaunchAgent({ stdout, env: resolvedEnv });
+    return;
+  }
+
+  const plistPath = resolveLaunchAgentPlistPath(resolvedEnv);
+  const plistExists = await launchAgentPlistExists(resolvedEnv);
+  if (!plistExists) {
+    throw new Error(`LaunchAgent plist not found at ${plistPath}`);
+  }
+
+  const repair = await repairLaunchAgentBootstrap({ env: resolvedEnv });
+  if (!repair.ok) {
+    throw new Error(`launchctl bootstrap failed: ${repair.detail ?? "unknown error"}`);
+  }
+
+  try {
+    stdout.write(`${formatLine("Started LaunchAgent", target)}\n`);
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException)?.code !== "EPIPE") {
+      throw err;
+    }
+  }
+}

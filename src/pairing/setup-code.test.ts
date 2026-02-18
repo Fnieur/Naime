@@ -146,4 +146,29 @@ describe("pairing setup code", () => {
     });
     expect(runCommandWithTimeout).not.toHaveBeenCalled();
   });
+
+  it("preserves IPv6 brackets when normalizing remote URL", async () => {
+    const resolved = await resolvePairingSetupFromConfig(
+      {
+        gateway: {
+          remote: { url: "wss://[fd7a:115c:a1e0::1]:443" },
+          auth: { mode: "token", token: "tok_123" },
+        },
+      },
+      {
+        preferRemoteUrl: true,
+      },
+    );
+
+    expect(resolved).toEqual({
+      ok: true,
+      payload: {
+        url: "wss://[fd7a:115c:a1e0::1]",
+        token: "tok_123",
+        password: undefined,
+      },
+      authLabel: "token",
+      urlSource: "gateway.remote.url",
+    });
+  });
 });
