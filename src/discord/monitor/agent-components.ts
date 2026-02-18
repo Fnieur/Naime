@@ -727,6 +727,8 @@ async function dispatchDiscordComponentEvent(params: {
   guildInfo: ReturnType<typeof resolveDiscordGuildEntry>;
   eventText: string;
   replyToId?: string;
+  /** The message ID that the component (button/select) belongs to */
+  sourceMessageId?: string;
   routeOverrides?: { sessionKey?: string; agentId?: string; accountId?: string };
 }): Promise<void> {
   const { ctx, interaction, interactionCtx, channelCtx, guildInfo, eventText } = params;
@@ -824,6 +826,7 @@ async function dispatchDiscordComponentEvent(params: {
     CommandAuthorized: true,
     CommandSource: "text" as const,
     MessageSid: interaction.rawData.id,
+    ReplyToId: params.sourceMessageId,
     Timestamp: timestamp,
     OriginatingChannel: "discord" as const,
     OriginatingTo: `channel:${interactionCtx.channelId}`,
@@ -1031,6 +1034,8 @@ async function handleDiscordComponentEvent(params: {
     logError(`${params.label}: failed to acknowledge interaction: ${String(err)}`);
   }
 
+  const sourceMessageId = consumed.messageId ?? params.interaction.message?.id;
+
   await dispatchDiscordComponentEvent({
     ctx: params.ctx,
     interaction: params.interaction,
@@ -1038,7 +1043,8 @@ async function handleDiscordComponentEvent(params: {
     channelCtx,
     guildInfo,
     eventText,
-    replyToId: consumed.messageId ?? params.interaction.message?.id,
+    replyToId: sourceMessageId,
+    sourceMessageId,
     routeOverrides: {
       sessionKey: consumed.sessionKey,
       agentId: consumed.agentId,
