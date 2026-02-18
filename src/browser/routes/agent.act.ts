@@ -22,6 +22,74 @@ import {
 import type { BrowserRouteRegistrar } from "./types.js";
 import { jsonError, toBoolean, toNumber, toStringArray, toStringOrEmpty } from "./utils.js";
 
+/**
+ * Check if a browser action requires elevated privileges.
+ * Actions like 'evaluate', 'close', 'wait' with fn parameter, and file operations
+ * are considered privileged as they can execute arbitrary code or affect browser state significantly.
+ */
+function requiresElevatedPrivileges(kind: ActKind, body: Record<string, unknown>): boolean {
+  if (kind === "evaluate" || kind === "close") {
+    return true;
+  }
+  // 'wait' with fn parameter allows arbitrary code execution
+  if (kind === "wait" && typeof body.fn === "string" && body.fn.trim()) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Verify that privileged browser actions are authorized.
+ * This enforces that dangerous operations like arbitrary JavaScript execution
+ * are only allowed when explicitly enabled via configuration.
+ */
+function authorizePrivilegedAction(
+  ctx: BrowserRouteContext,
+  kind: ActKind,
+  body: Record<string, unknown>,
+): { authorized: boolean; reason?: string } {
+  if (!requiresElevatedPrivileges(kind, body)) {
+    return { authorized: true };
+  }
+
+  const evaluateEnabled = ctx.state().resolved.evaluateEnabled;
+  
+  if (kind === "evaluate" && !evaluateEnabled) {
+    return {
+      authorized: false,
+      reason: [
+        "act:evaluate is disabled by config (browser.evaluateEnabled=false).",
+        "This action requires elevated privileges.",
+        "Docs: /gateway/configuration#browser-openclaw-managed-browser",
+      ].join("\n"),
+    };
+  }
+
+  if (kind === "wait" && typeof body.fn === "string" && !evaluateEnabled) {
+    return {
+      authorized: false,
+      reason: [
+        "wait --fn is disabled by config (browser.evaluateEnabled=false).",
+        "This action requires elevated privileges for code execution.",
+        "Docs: /gateway/configuration#browser-openclaw-managed-browser",
+      ].join("\n"),
+    };
+  }
+
+  if (kind === "close" && !evaluateEnabled) {
+    return {
+      authorized: false,
+      reason: [
+        "act:close is a privileged operation that requires browser.evaluateEnabled=true.",
+        "This prevents unauthorized termination of browser sessions.",
+        "Docs: /gateway/configuration#browser-openclaw-managed-browser",
+      ].join("\n"),
+    };
+  }
+
+  return { authorized: true };
+}
+
 export function registerBrowserAgentActRoutes(
   app: BrowserRouteRegistrar,
   ctx: BrowserRouteContext,
@@ -40,6 +108,12 @@ export function registerBrowserAgentActRoutes(
     const targetId = toStringOrEmpty(body.targetId) || undefined;
     if (Object.hasOwn(body, "selector") && kind !== "wait") {
       return jsonError(res, 400, SELECTOR_UNSUPPORTED_MESSAGE);
+    }
+
+    // Authorization check for privileged actions
+    const authCheck = authorizePrivilegedAction(ctx, kind, body);
+    if (!authCheck.authorized) {
+      return jsonError(res, 403, authCheck.reason || "Unauthorized: This action requires elevated privileges");
     }
 
     try {
@@ -297,16 +371,7 @@ export function registerBrowserAgentActRoutes(
           return res.json({ ok: true, targetId: tab.targetId });
         }
         case "evaluate": {
-          if (!evaluateEnabled) {
-            return jsonError(
-              res,
-              403,
-              [
-                "act:evaluate is disabled by config (browser.evaluateEnabled=false).",
-                "Docs: /gateway/configuration#browser-openclaw-managed-browser",
-              ].join("\n"),
-            );
-          }
+          // Authorization is now handled by the centralized check above
           const fn = toStringOrEmpty(body.fn);
           if (!fn) {
             return jsonError(res, 400, "fn is required");
