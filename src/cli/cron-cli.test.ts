@@ -538,24 +538,27 @@ describe("cron cli", () => {
 
   it("applies --exact to existing cron job without requiring --cron on edit", async () => {
     resetGatewayMock();
-    callGatewayFromCli.mockImplementation(
-      async (method: string, _opts: unknown, params?: unknown) => {
-        if (method === "cron.status") {
-          return { enabled: true };
-        }
-        if (method === "cron.list") {
-          return {
-            jobs: [
-              {
-                id: "job-1",
-                schedule: { kind: "cron", expr: "0 */2 * * *", tz: "UTC", staggerMs: 300_000 },
-              },
-            ],
-          };
-        }
-        return { ok: true, params };
-      },
-    );
+    callGatewayFromCli.mockImplementation((async (
+      method: string,
+      _opts: unknown,
+      params?: unknown,
+      _timeoutMs?: number,
+    ) => {
+      if (method === "cron.status") {
+        return { enabled: true };
+      }
+      if (method === "cron.list") {
+        return {
+          jobs: [
+            {
+              id: "job-1",
+              schedule: { kind: "cron", expr: "0 */2 * * *", tz: "UTC", staggerMs: 300_000 },
+            },
+          ],
+        };
+      }
+      return { ok: true, params };
+    }) as typeof defaultGatewayMock);
     const program = buildProgram();
 
     await program.parseAsync(["cron", "edit", "job-1", "--exact"], { from: "user" });
@@ -574,19 +577,22 @@ describe("cron cli", () => {
 
   it("rejects --exact on edit when existing job is not cron", async () => {
     resetGatewayMock();
-    callGatewayFromCli.mockImplementation(
-      async (method: string, _opts: unknown, params?: unknown) => {
-        if (method === "cron.status") {
-          return { enabled: true };
-        }
-        if (method === "cron.list") {
-          return {
-            jobs: [{ id: "job-1", schedule: { kind: "every", everyMs: 60_000 } }],
-          };
-        }
-        return { ok: true, params };
-      },
-    );
+    callGatewayFromCli.mockImplementation((async (
+      method: string,
+      _opts: unknown,
+      params?: unknown,
+      _timeoutMs?: number,
+    ) => {
+      if (method === "cron.status") {
+        return { enabled: true };
+      }
+      if (method === "cron.list") {
+        return {
+          jobs: [{ id: "job-1", schedule: { kind: "every", everyMs: 60_000 } }],
+        };
+      }
+      return { ok: true, params };
+    }) as typeof defaultGatewayMock);
     const program = buildProgram();
 
     await expect(
