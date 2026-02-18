@@ -3,6 +3,7 @@ import { resolvePluginTools } from "../plugins/tools.js";
 import type { GatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveSessionAgentId } from "./agent-scope.js";
 import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
+import type { SkillSnapshot } from "./skills.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
@@ -12,6 +13,7 @@ import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
+import { createRlmCallTool } from "./tools/rlm-call-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
@@ -61,6 +63,20 @@ export function createOpenClawTools(options?: {
   requireExplicitMessageTarget?: boolean;
   /** If true, omit the message tool from the tool list. */
   disableMessageTool?: boolean;
+  modelProvider?: string;
+  modelId?: string;
+  authProfileId?: string;
+  authProfileIdSource?: "auto" | "user";
+  thinkLevel?: import("../auto-reply/thinking.js").ThinkLevel;
+  verboseLevel?: import("../auto-reply/thinking.js").VerboseLevel;
+  lane?: string;
+  abortSignal?: AbortSignal;
+  extraSystemPrompt?: string;
+  inputProvenance?: import("../sessions/input-provenance.js").InputProvenance;
+  streamParams?: import("../commands/agent/types.js").AgentStreamParams;
+  skillsSnapshot?: SkillSnapshot;
+  senderIsOwner?: boolean;
+  fallbacksOverride?: string[];
 }): AnyAgentTool[] {
   const workspaceDir = resolveWorkspaceRoot(options?.workspaceDir);
   const imageTool = options?.agentDir?.trim()
@@ -97,6 +113,42 @@ export function createOpenClawTools(options?: {
         sandboxRoot: options?.sandboxRoot,
         requireExplicitTarget: options?.requireExplicitMessageTarget,
       });
+  const rlmToolEnabled = options?.config?.tools?.rlm?.enabled === true;
+  const rlmTool = rlmToolEnabled
+    ? createRlmCallTool({
+        config: options?.config,
+        sessionKey: options?.agentSessionKey,
+        agentId: options?.requesterAgentIdOverride,
+        messageChannel: options?.agentChannel,
+        agentAccountId: options?.agentAccountId,
+        messageTo: options?.agentTo,
+        messageThreadId: options?.agentThreadId,
+        groupId: options?.agentGroupId,
+        groupChannel: options?.agentGroupChannel,
+        groupSpace: options?.agentGroupSpace,
+        currentChannelId: options?.currentChannelId,
+        currentThreadTs: options?.currentThreadTs,
+        replyToMode: options?.replyToMode,
+        hasRepliedRef: options?.hasRepliedRef,
+        spawnedBy: undefined,
+        modelProvider: options?.modelProvider,
+        modelId: options?.modelId,
+        workspaceDir: options?.workspaceDir,
+        agentDir: options?.agentDir,
+        authProfileId: options?.authProfileId,
+        authProfileIdSource: options?.authProfileIdSource,
+        thinkLevel: options?.thinkLevel,
+        verboseLevel: options?.verboseLevel,
+        lane: options?.lane,
+        abortSignal: options?.abortSignal,
+        extraSystemPrompt: options?.extraSystemPrompt,
+        inputProvenance: options?.inputProvenance,
+        streamParams: options?.streamParams,
+        skillsSnapshot: options?.skillsSnapshot,
+        senderIsOwner: options?.senderIsOwner,
+        fallbacksOverride: options?.fallbacksOverride,
+      })
+    : null;
   const tools: AnyAgentTool[] = [
     createBrowserTool({
       sandboxBridgeUrl: options?.sandboxBrowserBridgeUrl,
@@ -155,6 +207,7 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
       config: options?.config,
     }),
+    ...(rlmTool ? [rlmTool] : []),
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),

@@ -50,6 +50,8 @@ const SUBAGENT_TOOL_DENY_ALWAYS = [
   // Status/scheduling - main agent coordinates
   "session_status",
   "cron",
+  // RLM orchestration should stay at main agent level by default.
+  "rlm_call",
   // Memory - pass relevant info in spawn prompt instead
   "memory_search",
   "memory_get",

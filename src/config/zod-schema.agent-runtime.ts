@@ -668,6 +668,17 @@ export const ToolsSchema = z
       })
       .strict()
       .optional(),
+    rlm: z
+      .object({
+        enabled: z.boolean().optional(),
+        maxDepth: z.number().int().min(0).max(8).optional(),
+        maxIterations: z.number().int().min(1).max(96).optional(),
+        maxLlmCalls: z.number().int().min(1).max(2048).optional(),
+        extractOnMaxIterations: z.boolean().optional(),
+        timeoutSeconds: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
     elevated: z
       .object({
         enabled: z.boolean().optional(),

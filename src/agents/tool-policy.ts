@@ -32,7 +32,7 @@ export const TOOL_GROUPS: Record<string, string[]> = {
   // UI helpers
   "group:ui": ["browser", "canvas"],
   // Automation + infra
-  "group:automation": ["cron", "gateway"],
+  "group:automation": ["cron", "gateway", "rlm_call"],
   // Messaging surface
   "group:messaging": ["message"],
   // Nodes + device tools
@@ -52,6 +52,7 @@ export const TOOL_GROUPS: Record<string, string[]> = {
     "sessions_spawn",
     "subagents",
     "session_status",
+    "rlm_call",
     "memory_search",
     "memory_get",
     "web_search",

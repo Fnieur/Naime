@@ -213,6 +213,21 @@ function buildChatCommands(): ChatCommandDefinition[] {
       ],
     }),
     defineChatCommand({
+      key: "rlm",
+      description: "Run the RLM harness (recursive LM) and return JSON.",
+      textAlias: "/rlm",
+      acceptsArgs: true,
+      category: "tools",
+      args: [
+        {
+          name: "query",
+          description: "RLM query",
+          type: "string",
+          captureRemaining: true,
+        },
+      ],
+    }),
+    defineChatCommand({
       key: "tts",
       nativeName: "tts",
       description: "Control text-to-speech (TTS).",

@@ -510,6 +510,21 @@ export type ToolsConfig = {
      */
     visibility?: SessionsToolsVisibility;
   };
+  /** Recursive language model tool gate and defaults. */
+  rlm?: {
+    /** Enable rlm_call tool (default: false). */
+    enabled?: boolean;
+    /** Default recursion depth for rlm_call. */
+    maxDepth?: number;
+    /** Max solver iterations per recursion depth. */
+    maxIterations?: number;
+    /** Max recursive LM calls across one RLM run. */
+    maxLlmCalls?: number;
+    /** If true, run extract fallback on iteration exhaustion. */
+    extractOnMaxIterations?: boolean;
+    /** Default timeout for rlm_call (seconds). */
+    timeoutSeconds?: number;
+  };
   /** Elevated exec permissions for the host machine. */
   elevated?: {
     /** Enable or disable elevated mode (default: true). */

@@ -143,6 +143,20 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("sessions_send");
   });
 
+  it("includes rlm_call guidance only when rlm_call is available", () => {
+    const withRlm = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      toolNames: ["rlm_call"],
+    });
+    expect(withRlm).toContain("rlm_call: Run recursive LM workflow");
+
+    const withoutRlm = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openclaw",
+      toolNames: ["exec"],
+    });
+    expect(withoutRlm).not.toContain("rlm_call: Run recursive LM workflow");
+  });
+
   it("preserves tool casing in the prompt", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",

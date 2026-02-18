@@ -84,6 +84,22 @@ describe("sessions tools", () => {
     expect(schemaProp("subagents", "recentMinutes").type).toBe("number");
   });
 
+  it("hides rlm_call unless tools.rlm.enabled is true", () => {
+    const defaultTools = createOpenClawTools();
+    expect(defaultTools.some((tool) => tool.name === "rlm_call")).toBe(false);
+
+    const rlmEnabledTools = createOpenClawTools({
+      config: {
+        tools: {
+          rlm: {
+            enabled: true,
+          },
+        },
+      } as never,
+    });
+    expect(rlmEnabledTools.some((tool) => tool.name === "rlm_call")).toBe(true);
+  });
+
   it("sessions_list filters kinds and includes messages", async () => {
     callGatewayMock.mockReset();
     callGatewayMock.mockImplementation(async (opts: unknown) => {

@@ -284,6 +284,11 @@
       "title": "Session Status",
       "detailKeys": ["sessionKey", "model"]
     },
+    "rlm_call": {
+      "emoji": "🔄",
+      "title": "RLM Call",
+      "detailKeys": ["query", "maxDepth", "timeoutSeconds"]
+    },
     "memory_search": {
       "emoji": "🧠",
       "title": "Memory Search",
