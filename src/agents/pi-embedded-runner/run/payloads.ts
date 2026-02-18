@@ -56,7 +56,7 @@ function shouldShowToolErrorWarning(params: {
   const isMutatingToolError =
     params.lastToolError.mutatingAction ?? isLikelyMutatingToolName(params.lastToolError.toolName);
   if (isMutatingToolError) {
-    return true;
+    return !params.suppressToolErrors;
   }
   if (params.suppressToolErrors) {
     return false;
@@ -255,7 +255,8 @@ export function buildEmbeddedRunPayloads(params: {
       suppressToolErrorWarnings: params.suppressToolErrorWarnings,
     });
 
-    // Always surface mutating tool failures so we do not silently confirm actions that did not happen.
+    // Surface mutating tool failures unless suppressToolErrors is enabled,
+    // so we do not silently confirm actions that did not happen.
     // Otherwise, keep the previous behavior and only surface non-recoverable failures when no reply exists.
     if (shouldShowToolError) {
       const toolSummary = formatToolAggregate(
