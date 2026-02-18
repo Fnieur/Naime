@@ -500,27 +500,31 @@ export async function runHeartbeatOnce(opts: {
     return { status: "skipped", reason: "quiet-hours" };
   }
 
+  // Detect event-driven reasons (exec completion, cron, wake, hooks) early.
+  // These have pending system events that must be processed regardless of
+  // queue state or HEARTBEAT.md content.
+  const isExecEventReason =
+    opts.reason === "exec-event" || Boolean(opts.reason?.startsWith("exec:"));
+  const isCronEventReason = Boolean(opts.reason?.startsWith("cron:"));
+  const isWakeReason = opts.reason === "wake" || Boolean(opts.reason?.startsWith("hook:"));
+  const isEventDriven = isExecEventReason || isCronEventReason || isWakeReason;
+
   const queueSize = (opts.deps?.getQueueSize ?? getQueueSize)(CommandLane.Main);
-  if (queueSize > 0) {
+  if (queueSize > 0 && !isEventDriven) {
     return { status: "skipped", reason: "requests-in-flight" };
   }
 
   // Skip heartbeat if HEARTBEAT.md exists but has no actionable content.
   // This saves API calls/costs when the file is effectively empty (only comments/headers).
-  // EXCEPTION: Don't skip for exec events, cron events, or explicit wake requests -
+  // EXCEPTION: Don't skip for event-driven reasons —
   // they have pending system events to process regardless of HEARTBEAT.md content.
-  const isExecEventReason = opts.reason === "exec-event";
-  const isCronEventReason = Boolean(opts.reason?.startsWith("cron:"));
-  const isWakeReason = opts.reason === "wake" || Boolean(opts.reason?.startsWith("hook:"));
   const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
   const heartbeatFilePath = path.join(workspaceDir, DEFAULT_HEARTBEAT_FILENAME);
   try {
     const heartbeatFileContent = await fs.readFile(heartbeatFilePath, "utf-8");
     if (
       isHeartbeatContentEffectivelyEmpty(heartbeatFileContent) &&
-      !isExecEventReason &&
-      !isCronEventReason &&
-      !isWakeReason
+      !isEventDriven
     ) {
       emitHeartbeatEvent({
         status: "skipped",
@@ -572,12 +576,12 @@ export async function runHeartbeatOnce(opts: {
   // Check if this is an exec event or cron event with pending system events.
   // If so, use a specialized prompt that instructs the model to relay the result
   // instead of the standard heartbeat prompt with "reply HEARTBEAT_OK".
-  const isExecEvent = opts.reason === "exec-event";
   const pendingEventEntries = peekSystemEventEntries(sessionKey);
   const hasTaggedCronEvents = pendingEventEntries.some((event) =>
     event.contextKey?.startsWith("cron:"),
   );
-  const shouldInspectPendingEvents = isExecEvent || isCronEventReason || hasTaggedCronEvents;
+  const shouldInspectPendingEvents =
+    isExecEventReason || isCronEventReason || hasTaggedCronEvents;
   const pendingEvents = shouldInspectPendingEvents
     ? pendingEventEntries.map((event) => event.text)
     : [];
