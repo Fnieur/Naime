@@ -107,7 +107,9 @@ actor PortGuardian {
         let status: Status
         let listeners: [ReportListener]
 
-        var id: Int { self.port }
+        var id: Int {
+            self.port
+        }
 
         var offenders: [ReportListener] {
             if case let .interference(_, offenders) = self.status { return offenders }
@@ -145,7 +147,9 @@ actor PortGuardian {
         let user: String?
         let expected: Bool
 
-        var id: Int32 { self.pid }
+        var id: Int32 {
+            self.pid
+        }
     }
 
     func diagnose(mode: AppState.ConnectionMode) async -> [PortReport] {
