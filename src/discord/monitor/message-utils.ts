@@ -237,10 +237,10 @@ export function resolveDiscordMessageText(
   options?: { fallbackText?: string; includeForwarded?: boolean },
 ): string {
   const baseText =
-    message.content?.trim() ||
+    (typeof message.content === "string" ? message.content.trim() : "") ||
     buildDiscordAttachmentPlaceholder(message.attachments) ||
-    message.embeds?.[0]?.description ||
-    options?.fallbackText?.trim() ||
+    (typeof message.embeds?.[0]?.description === "string" ? message.embeds[0].description : "") ||
+    (typeof options?.fallbackText === "string" ? options.fallbackText.trim() : "") ||
     "";
   if (!options?.includeForwarded) {
     return baseText;
@@ -298,10 +298,12 @@ function resolveDiscordMessageSnapshots(message: Message): DiscordMessageSnapsho
 }
 
 function resolveDiscordSnapshotMessageText(snapshot: DiscordSnapshotMessage): string {
-  const content = snapshot.content?.trim() ?? "";
+  const content = typeof snapshot.content === "string" ? snapshot.content.trim() : "";
   const attachmentText = buildDiscordAttachmentPlaceholder(snapshot.attachments ?? undefined);
   const embed = snapshot.embeds?.[0];
-  const embedText = embed?.description?.trim() || embed?.title?.trim() || "";
+  const embedText =
+    (typeof embed?.description === "string" ? embed.description.trim() : "") ||
+    (typeof embed?.title === "string" ? embed.title.trim() : "");
   return content || attachmentText || embedText || "";
 }
 
