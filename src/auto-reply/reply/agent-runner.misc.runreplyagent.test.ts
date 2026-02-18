@@ -1173,6 +1173,165 @@ describe("runReplyAgent response usage footer", () => {
   });
 });
 
+describe("runReplyAgent usage footer sent when blockStreaming drops final payloads", () => {
+  function createBlockStreamingRun(params: {
+    responseUsage?: "tokens" | "full" | "off";
+    usage?: { input: number; output: number };
+  }) {
+    const onBlockReply = vi.fn();
+
+    runEmbeddedPiAgentMock.mockImplementationOnce(async (agentParams) => {
+      const block = agentParams.onBlockReply as
+        | ((payload: { text?: string }) => void)
+        | undefined;
+      block?.({ text: "Streamed chunk" });
+      return {
+        payloads: [{ text: "Final message" }],
+        meta: {
+          agentMeta: {
+            provider: "anthropic",
+            model: "claude",
+            usage: params.usage ?? { input: 100, output: 50 },
+          },
+        },
+      };
+    });
+
+    const typing = createMockTypingController();
+    const sessionCtx = {
+      Provider: "telegram",
+      OriginatingTo: "chat:123",
+      AccountId: "primary",
+      MessageSid: "msg",
+    } as unknown as TemplateContext;
+    const resolvedQueue = { mode: "interrupt" } as unknown as QueueSettings;
+
+    const sessionEntry: SessionEntry = {
+      sessionId: "session",
+      updatedAt: Date.now(),
+      responseUsage: params.responseUsage ?? "full",
+    };
+
+    const sessionKey = "agent:main:telegram:dm:123";
+    const followupRun = {
+      prompt: "hello",
+      summaryLine: "hello",
+      enqueuedAt: Date.now(),
+      run: {
+        agentId: "main",
+        agentDir: "/tmp/agent",
+        sessionId: "session",
+        sessionKey,
+        messageProvider: "telegram",
+        sessionFile: "/tmp/session.jsonl",
+        workspaceDir: "/tmp",
+        config: {
+          agents: {
+            defaults: {
+              blockStreamingCoalesce: {
+                minChars: 1,
+                maxChars: 200,
+                idleMs: 0,
+              },
+            },
+          },
+        },
+        skillsSnapshot: {},
+        provider: "anthropic",
+        model: "claude",
+        thinkLevel: "low",
+        verboseLevel: "off",
+        elevatedLevel: "off",
+        bashElevated: {
+          enabled: false,
+          allowed: false,
+          defaultLevel: "off",
+        },
+        timeoutMs: 1_000,
+        blockReplyBreak: "text_end",
+      },
+    } as unknown as FollowupRun;
+
+    const resultPromise = runReplyAgent({
+      commandBody: "hello",
+      followupRun,
+      queueKey: "main",
+      resolvedQueue,
+      shouldSteer: false,
+      shouldFollowup: false,
+      isActive: false,
+      isStreaming: false,
+      opts: { onBlockReply },
+      typing,
+      sessionCtx,
+      sessionEntry,
+      sessionStore: { [sessionKey]: sessionEntry },
+      sessionKey,
+      defaultModel: "anthropic/claude-opus-4-5",
+      resolvedVerboseLevel: "off",
+      isNewSession: false,
+      blockStreamingEnabled: true,
+      blockReplyChunking: {
+        minChars: 1,
+        maxChars: 200,
+        breakPreference: "paragraph",
+      },
+      resolvedBlockStreamingBreak: "text_end",
+      shouldInjectGroupIntro: false,
+      typingMode: "instant",
+    });
+
+    return { resultPromise, onBlockReply, sessionKey };
+  }
+
+  it("sends usage footer as standalone payload when block streaming succeeded", async () => {
+    const { resultPromise, onBlockReply, sessionKey } = createBlockStreamingRun({
+      responseUsage: "full",
+    });
+    const result = await resultPromise;
+
+    expect(onBlockReply).toHaveBeenCalled();
+    expect(result).toBeDefined();
+    const text = String((result as { text?: string })?.text ?? "");
+    expect(text).toContain("Usage:");
+    expect(text).toContain(`· session ${sessionKey}`);
+  });
+
+  it("sends usage footer without session key when responseUsage=tokens", async () => {
+    const { resultPromise, onBlockReply } = createBlockStreamingRun({
+      responseUsage: "tokens",
+    });
+    const result = await resultPromise;
+
+    expect(onBlockReply).toHaveBeenCalled();
+    expect(result).toBeDefined();
+    const text = String((result as { text?: string })?.text ?? "");
+    expect(text).toContain("Usage:");
+    expect(text).not.toContain("· session ");
+  });
+
+  it("returns undefined when responseUsage=off and block streaming drops payloads", async () => {
+    const { resultPromise, onBlockReply } = createBlockStreamingRun({
+      responseUsage: "off",
+    });
+    const result = await resultPromise;
+
+    expect(onBlockReply).toHaveBeenCalled();
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined when usage is zero and block streaming drops payloads", async () => {
+    const { resultPromise, onBlockReply } = createBlockStreamingRun({
+      responseUsage: "full",
+      usage: { input: 0, output: 0 },
+    });
+    const result = await resultPromise;
+
+    expect(onBlockReply).toHaveBeenCalled();
+    expect(result).toBeUndefined();
+  });
+});
+
 describe("runReplyAgent transient HTTP retry", () => {
   it("retries once after transient 521 HTML failure and then succeeds", async () => {
     vi.useFakeTimers();
