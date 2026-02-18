@@ -253,6 +253,15 @@ function loadSkillEntries(
       }
 
       const loaded = loadSkillsFromDir({ dir: baseDir, source: params.source });
+      // Log any diagnostics from skill loading (e.g., YAML parsing errors)
+      for (const diagnostic of loaded.diagnostics ?? []) {
+        // Extract skill name from path (e.g., /path/to/skills/my-skill/SKILL.md -> my-skill)
+        const skillName = diagnostic.path ? path.basename(path.dirname(diagnostic.path)) : "unknown";
+        skillsLogger.warn(`Skill "${skillName}": ${diagnostic.message}`, {
+          path: diagnostic.path,
+          type: diagnostic.type,
+        });
+      }
       return unwrapLoadedSkills(loaded);
     }
 
@@ -304,6 +313,15 @@ function loadSkillEntries(
       }
 
       const loaded = loadSkillsFromDir({ dir: skillDir, source: params.source });
+      // Log any diagnostics from skill loading (e.g., YAML parsing errors)
+      for (const diagnostic of loaded.diagnostics ?? []) {
+        // Extract skill name from path (e.g., /path/to/skills/my-skill/SKILL.md -> my-skill)
+        const skillName = diagnostic.path ? path.basename(path.dirname(diagnostic.path)) : "unknown";
+        skillsLogger.warn(`Skill "${skillName}": ${diagnostic.message}`, {
+          path: diagnostic.path,
+          type: diagnostic.type,
+        });
+      }
       loadedSkills.push(...unwrapLoadedSkills(loaded));
 
       if (loadedSkills.length >= limits.maxSkillsLoadedPerSource) {
@@ -392,8 +410,11 @@ function loadSkillEntries(
     try {
       const raw = fs.readFileSync(skill.filePath, "utf-8");
       frontmatter = parseFrontmatter(raw);
-    } catch {
-      // ignore malformed skills
+    } catch (err) {
+      skillsLogger.warn("Failed to parse skill frontmatter", {
+        filePath: skill.filePath,
+        error: String(err),
+      });
     }
     return {
       skill,
