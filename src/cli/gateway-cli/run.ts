@@ -164,7 +164,7 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
   const configExists = snapshot?.exists ?? fs.existsSync(CONFIG_PATH);
   const configAuditPath = path.join(resolveStateDir(process.env), "logs", "config-audit.jsonl");
   const mode = cfg.gateway?.mode;
-  if (!opts.allowUnconfigured && mode !== "local") {
+  if (!opts.allowUnconfigured && mode !== "local" && mode !== undefined) {
     if (!configExists) {
       defaultRuntime.error(
         `Missing config. Run \`${formatCliCommand("openclaw setup")}\` or set gateway.mode=local (or pass --allow-unconfigured).`,
