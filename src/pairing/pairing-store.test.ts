@@ -222,4 +222,57 @@ describe("pairing store", () => {
       expect(scoped).toEqual(["1002", "1001"]);
     });
   });
+
+  it("approves pairing code via crypto.timingSafeEqual", async () => {
+    const spy = vi.spyOn(crypto, "timingSafeEqual");
+    try {
+      await withTempStateDir(async () => {
+        const created = await upsertChannelPairingRequest({
+          channel: "signal",
+          id: "+15559999999",
+        });
+        expect(created.created).toBe(true);
+
+        // Correct code (case-insensitive) should approve and hit the constant-time path
+        spy.mockClear();
+        const approved = await approveChannelPairingCode({
+          channel: "signal",
+          code: created.code.toLowerCase(),
+        });
+        expect(approved?.id).toBe("+15559999999");
+        expect(spy).toHaveBeenCalled();
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("rejects wrong code of same length via timing-safe path", async () => {
+    await withTempStateDir(async () => {
+      await upsertChannelPairingRequest({
+        channel: "signal",
+        id: "+15558888888",
+      });
+      const rejected = await approveChannelPairingCode({
+        channel: "signal",
+        code: "ZZZZZZZZ",
+      });
+      expect(rejected).toBeNull();
+    });
+  });
+
+  it("rejects wrong code of different length without timing leak", async () => {
+    await withTempStateDir(async () => {
+      await upsertChannelPairingRequest({
+        channel: "signal",
+        id: "+15557777777",
+      });
+      // Short code — hits the length-check branch before timingSafeEqual
+      const rejected = await approveChannelPairingCode({
+        channel: "signal",
+        code: "ZZZ",
+      });
+      expect(rejected).toBeNull();
+    });
+  });
 });
