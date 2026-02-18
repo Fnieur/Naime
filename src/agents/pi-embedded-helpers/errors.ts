@@ -635,6 +635,7 @@ const ERROR_PATTERNS = {
     "messages.1.content.1.tool_use.id",
     "invalid request format",
   ],
+  unknownModel: ["unknown model", "model not found", "model does not exist", "no such model"],
 } as const;
 
 const TOOL_CALL_INPUT_MISSING_RE =
@@ -704,6 +705,10 @@ export function isAuthErrorMessage(raw: string): boolean {
 
 export function isOverloadedErrorMessage(raw: string): boolean {
   return matchesErrorPatterns(raw, ERROR_PATTERNS.overloaded);
+}
+
+export function isUnknownModelErrorMessage(raw: string): boolean {
+  return matchesErrorPatterns(raw, ERROR_PATTERNS.unknownModel);
 }
 
 export function parseImageDimensionError(raw: string): {
@@ -779,6 +784,9 @@ export function classifyFailoverReason(raw: string): FailoverReason | null {
   if (isTransientHttpError(raw)) {
     // Treat transient 5xx provider failures as retryable transport issues.
     return "timeout";
+  }
+  if (isUnknownModelErrorMessage(raw)) {
+    return "unknown";
   }
   if (isRateLimitErrorMessage(raw)) {
     return "rate_limit";
