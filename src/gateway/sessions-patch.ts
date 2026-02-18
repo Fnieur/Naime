@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { resolveDefaultAgentId } from "../agents/agent-scope.js";
+import { resolveAgentConfig, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
-import { resolveAllowedModelRef, resolveDefaultModelForAgent } from "../agents/model-selection.js";
+import {
+  normalizeModelSelection,
+  resolveAllowedModelRef,
+  resolveDefaultModelForAgent,
+} from "../agents/model-selection.js";
 import { normalizeGroupActivation } from "../auto-reply/group-activation.js";
 import {
   formatThinkingLevels,
@@ -58,6 +62,15 @@ function normalizeExecAsk(raw: string): "off" | "on-miss" | "always" | undefined
   return undefined;
 }
 
+function resolveSubagentModelHint(cfg: OpenClawConfig, agentId: string): string | undefined {
+  const agentConfig = resolveAgentConfig(cfg, agentId);
+  return (
+    normalizeModelSelection(agentConfig?.subagents?.model) ??
+    normalizeModelSelection(cfg.agents?.defaults?.subagents?.model) ??
+    normalizeModelSelection(agentConfig?.model)
+  );
+}
+
 export async function applySessionsPatchToStore(params: {
   cfg: OpenClawConfig;
   store: Record<string, SessionEntry>;
@@ -70,6 +83,9 @@ export async function applySessionsPatchToStore(params: {
   const parsedAgent = parseAgentSessionKey(storeKey);
   const sessionAgentId = normalizeAgentId(parsedAgent?.agentId ?? resolveDefaultAgentId(cfg));
   const resolvedDefault = resolveDefaultModelForAgent({ cfg, agentId: sessionAgentId });
+  const subagentModelHint = isSubagentSessionKey(storeKey)
+    ? resolveSubagentModelHint(cfg, sessionAgentId)
+    : undefined;
 
   const existing = store[storeKey];
   const next: SessionEntry = existing
@@ -298,7 +314,7 @@ export async function applySessionsPatchToStore(params: {
         catalog,
         raw: trimmed,
         defaultProvider: resolvedDefault.provider,
-        defaultModel: resolvedDefault.model,
+        defaultModel: subagentModelHint ?? resolvedDefault.model,
       });
       if ("error" in resolved) {
         return invalid(resolved.error);

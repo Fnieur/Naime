@@ -146,6 +146,22 @@ export function parseModelRef(raw: string, defaultProvider: string): ModelRef | 
   return normalizeModelRef(providerRaw, model);
 }
 
+export function normalizeModelSelection(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const primary = (value as { primary?: unknown }).primary;
+  if (typeof primary === "string") {
+    const trimmed = primary.trim();
+    return trimmed || undefined;
+  }
+  return undefined;
+}
+
 export function resolveAllowlistModelKey(raw: string, defaultProvider: string): string | null {
   const parsed = parseModelRef(raw, defaultProvider);
   if (!parsed) {
@@ -316,10 +332,11 @@ export function buildAllowedModelSet(params: {
   })();
   const allowAny = rawAllowlist.length === 0;
   const defaultModel = params.defaultModel?.trim();
-  const defaultKey =
+  const defaultRef =
     defaultModel && params.defaultProvider
-      ? modelKey(params.defaultProvider, defaultModel)
-      : undefined;
+      ? parseModelRef(defaultModel, params.defaultProvider)
+      : null;
+  const defaultKey = defaultRef ? modelKey(defaultRef.provider, defaultRef.model) : undefined;
   const catalogKeys = new Set(params.catalog.map((entry) => modelKey(entry.provider, entry.id)));
 
   if (allowAny) {

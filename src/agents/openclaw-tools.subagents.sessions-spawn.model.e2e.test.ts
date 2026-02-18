@@ -8,6 +8,7 @@ import {
   setSessionsSpawnConfigOverride,
 } from "./openclaw-tools.subagents.sessions-spawn.test-harness.js";
 import { resetSubagentRegistryForTests } from "./subagent-registry.js";
+import { SUBAGENT_SPAWN_ACCEPTED_NOTE } from "./subagent-spawn.js";
 
 const callGatewayMock = getCallGatewayMock();
 type GatewayCall = { method?: string; params?: unknown };
@@ -83,7 +84,7 @@ describe("openclaw-tools: subagents (sessions_spawn model + thinking)", () => {
     });
     expect(result.details).toMatchObject({
       status: "accepted",
-      note: "auto-announces on completion, do not poll",
+      note: SUBAGENT_SPAWN_ACCEPTED_NOTE,
       modelApplied: true,
     });
 
@@ -254,7 +255,7 @@ describe("openclaw-tools: subagents (sessions_spawn model + thinking)", () => {
     });
   });
 
-  it("sessions_spawn skips invalid model overrides and continues", async () => {
+  it("sessions_spawn fails when model patch is rejected", async () => {
     resetSubagentRegistryForTests();
     callGatewayMock.mockReset();
     const calls: GatewayCall[] = [];
@@ -281,13 +282,10 @@ describe("openclaw-tools: subagents (sessions_spawn model + thinking)", () => {
       model: "bad-model",
     });
     expect(result.details).toMatchObject({
-      status: "accepted",
-      modelApplied: false,
+      status: "error",
     });
-    expect(String((result.details as { warning?: string }).warning ?? "")).toContain(
-      "invalid model",
-    );
-    expect(calls.some((call) => call.method === "agent")).toBe(true);
+    expect(String((result.details as { error?: string }).error ?? "")).toContain("invalid model");
+    expect(calls.some((call) => call.method === "agent")).toBe(false);
   });
 
   it("sessions_spawn supports legacy timeoutSeconds alias", async () => {
