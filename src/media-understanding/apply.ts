@@ -50,6 +50,8 @@ const EXTRA_TEXT_MIMES = [
   "text/javascript",
   "text/tab-separated-values",
 ];
+/** MIME types with dedicated extraction logic that should not be overridden by the text heuristic. */
+const DEDICATED_EXTRACTION_MIMES = new Set(["application/pdf"]);
 const TEXT_EXT_MIME = new Map<string, string>([
   [".csv", "text/csv"],
   [".tsv", "text/tab-separated-values"],
@@ -385,9 +387,16 @@ async function extractFileBlocks(params: {
     const guessedDelimited = textLike ? guessDelimitedMime(textSample) : undefined;
     const textHint =
       forcedTextMimeResolved ?? guessedDelimited ?? (textLike ? "text/plain" : undefined);
-    const mimeType = sanitizeMimeType(textHint ?? normalizeMimeType(rawMime));
+    // Don't let the text heuristic override MIME types that have dedicated
+    // extraction logic (e.g. application/pdf).  PDFs start with ASCII bytes
+    // (%PDF-1.7) which fools looksLikeUtf8Text(), causing textHint to
+    // clobber the real MIME type and skip PDF-specific text extraction.
+    const preserveRawMime = normalizedRawMime && DEDICATED_EXTRACTION_MIMES.has(normalizedRawMime);
+    const mimeType = sanitizeMimeType(
+      preserveRawMime ? normalizedRawMime : (textHint ?? normalizeMimeType(rawMime)),
+    );
     // Log when MIME type is overridden from non-text to text for auditability
-    if (textHint && rawMime && !rawMime.startsWith("text/")) {
+    if (textHint && rawMime && !rawMime.startsWith("text/") && !preserveRawMime) {
       logVerbose(
         `media: MIME override from "${rawMime}" to "${textHint}" for index=${attachment.index}`,
       );
