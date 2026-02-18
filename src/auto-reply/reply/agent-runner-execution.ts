@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import type { TemplateContext } from "../templating.js";
+import type { VerboseLevel } from "../thinking.js";
+import type { GetReplyOptions, ReplyPayload } from "../types.js";
+import type { FollowupRun } from "./queue.js";
+import type { TypingSignaler } from "./typing-mode.js";
 import { resolveAgentModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { runCliAgent } from "../../agents/cli-runner.js";
 import { getCliSessionId } from "../../agents/cli-session.js";
@@ -22,16 +27,14 @@ import {
 } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
+import { emitDiagnosticEvent, isDiagnosticsEnabled } from "../../infra/diagnostic-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
 } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
-import type { TemplateContext } from "../templating.js";
-import type { VerboseLevel } from "../thinking.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
-import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import {
   buildEmbeddedContextFromTemplate,
   buildTemplateSenderContext,
@@ -39,9 +42,7 @@ import {
 } from "./agent-runner-utils.js";
 import { resolveEnforceFinalTag } from "./agent-runner-utils.js";
 import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
-import type { FollowupRun } from "./queue.js";
 import { createBlockReplyDeliveryHandler } from "./reply-delivery.js";
-import type { TypingSignaler } from "./typing-mode.js";
 
 export type AgentRunLoopResult =
   | {
@@ -55,6 +56,9 @@ export type AgentRunLoopResult =
       directlySentBlockKeys?: Set<string>;
     }
   | { kind: "final"; payload: ReplyPayload };
+
+export const CONTEXT_OVERFLOW_FALLBACK_TEXT =
+  "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model.";
 
 export async function runAgentTurnWithFallback(params: {
   commandBody: string;
@@ -91,6 +95,7 @@ export async function runAgentTurnWithFallback(params: {
   const directlySentBlockKeys = new Set<string>();
 
   const runId = params.opts?.runId ?? crypto.randomUUID();
+  const diagnosticsEnabled = isDiagnosticsEnabled(params.followupRun.run.config);
   params.opts?.onAgentRunStart?.(runId);
   if (params.sessionKey) {
     registerAgentRunContext(runId, {
@@ -104,6 +109,39 @@ export async function runAgentTurnWithFallback(params: {
   let fallbackModel = params.followupRun.run.model;
   let didResetAfterCompactionFailure = false;
   let didRetryTransientHttpError = false;
+  const emitOverflowRecoveryEvent = (event: {
+    stage: "detected" | "decision" | "action" | "result" | "finalized";
+    branch?:
+      | "retry_after_in_attempt_compaction"
+      | "compact"
+      | "truncate_tool_results"
+      | "give_up"
+      | "reset_after_compaction_failure"
+      | "fallback_payload_returned"
+      | "fallback_payload_injected_after_empty";
+    outcome?: "retrying" | "compacted" | "truncated" | "failed" | "returned_error_payload";
+    attempt?: number;
+    maxAttempts?: number;
+    errorKind?: "context_overflow" | "compaction_failure";
+    reasonClass?:
+      | "prompt_error"
+      | "assistant_error"
+      | "embedded_meta_error"
+      | "empty_payload_after_error";
+  }) => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
+    emitDiagnosticEvent({
+      type: "overflow.recovery",
+      runId,
+      sessionKey: params.sessionKey,
+      sessionId: params.getActiveSessionEntry()?.sessionId ?? params.followupRun.run.sessionId,
+      provider: fallbackProvider,
+      model: fallbackModel,
+      ...event,
+    });
+  };
 
   while (true) {
     try {
@@ -422,10 +460,37 @@ export async function runAgentTurnWithFallback(params: {
         (await params.resetSessionAfterCompactionFailure(embeddedError.message))
       ) {
         didResetAfterCompactionFailure = true;
+        emitOverflowRecoveryEvent({
+          stage: "finalized",
+          branch: "reset_after_compaction_failure",
+          outcome: "returned_error_payload",
+          errorKind: "context_overflow",
+          reasonClass: "embedded_meta_error",
+        });
         return {
           kind: "final",
           payload: {
             text: "⚠️ Context limit exceeded. I've reset our conversation to start fresh - please try again.\n\nTo prevent this, increase your compaction buffer by setting `agents.defaults.compaction.reserveTokensFloor` to 4000 or higher in your config.",
+          },
+        };
+      }
+      if (
+        embeddedError &&
+        isContextOverflowError(embeddedError.message) &&
+        (runResult.payloads?.length ?? 0) === 0
+      ) {
+        emitOverflowRecoveryEvent({
+          stage: "finalized",
+          branch: "fallback_payload_returned",
+          outcome: "returned_error_payload",
+          errorKind: "context_overflow",
+          reasonClass: "embedded_meta_error",
+        });
+        return {
+          kind: "final",
+          payload: {
+            text: CONTEXT_OVERFLOW_FALLBACK_TEXT,
+            isError: true,
           },
         };
       }
@@ -456,6 +521,13 @@ export async function runAgentTurnWithFallback(params: {
         (await params.resetSessionAfterCompactionFailure(message))
       ) {
         didResetAfterCompactionFailure = true;
+        emitOverflowRecoveryEvent({
+          stage: "finalized",
+          branch: "reset_after_compaction_failure",
+          outcome: "returned_error_payload",
+          errorKind: "compaction_failure",
+          reasonClass: "prompt_error",
+        });
         return {
           kind: "final",
           payload: {
@@ -541,10 +613,19 @@ export async function runAgentTurnWithFallback(params: {
         : message;
       const trimmedMessage = safeMessage.replace(/\.\s*$/, "");
       const fallbackText = isContextOverflow
-        ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model."
+        ? CONTEXT_OVERFLOW_FALLBACK_TEXT
         : isRoleOrderingError
           ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session."
           : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openclaw logs --follow`;
+      if (isContextOverflow) {
+        emitOverflowRecoveryEvent({
+          stage: "finalized",
+          branch: "fallback_payload_returned",
+          outcome: "returned_error_payload",
+          errorKind: isCompactionFailure ? "compaction_failure" : "context_overflow",
+          reasonClass: "prompt_error",
+        });
+      }
 
       return {
         kind: "final",

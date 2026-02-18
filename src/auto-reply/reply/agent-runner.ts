@@ -1,5 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import type { TypingMode } from "../../config/types.js";
+import type { OriginatingChannelType, TemplateContext } from "../templating.js";
+import type { GetReplyOptions, ReplyPayload } from "../types.js";
+import type { TypingController } from "./typing.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
@@ -14,15 +18,15 @@ import {
   updateSessionStore,
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
-import type { TypingMode } from "../../config/types.js";
 import { emitDiagnosticEvent, isDiagnosticsEnabled } from "../../infra/diagnostic-events.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
-import type { OriginatingChannelType, TemplateContext } from "../templating.js";
 import { resolveResponseUsageMode, type VerboseLevel } from "../thinking.js";
-import type { GetReplyOptions, ReplyPayload } from "../types.js";
-import { runAgentTurnWithFallback } from "./agent-runner-execution.js";
+import {
+  CONTEXT_OVERFLOW_FALLBACK_TEXT,
+  runAgentTurnWithFallback,
+} from "./agent-runner-execution.js";
 import {
   createShouldEmitToolOutput,
   createShouldEmitToolResult,
@@ -47,7 +51,6 @@ import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queu
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
 import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
 import { createTypingSignaler } from "./typing-mode.js";
-import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
 const UNSCHEDULED_REMINDER_NOTE =
@@ -375,6 +378,14 @@ export async function runReplyAgent(params: {
 
     const { runResult, fallbackProvider, fallbackModel, directlySentBlockKeys } = runOutcome;
     let { didLogHeartbeatStrip, autoCompactionCompleted } = runOutcome;
+    const runErrorKind = runResult.meta?.error?.kind;
+    const overflowRecoveryErrorKind =
+      runErrorKind === "context_overflow" || runErrorKind === "compaction_failure"
+        ? runErrorKind
+        : undefined;
+    const runErrorFallbackPayload = overflowRecoveryErrorKind
+      ? ({ text: CONTEXT_OVERFLOW_FALLBACK_TEXT, isError: true } satisfies ReplyPayload)
+      : undefined;
 
     if (
       shouldInjectGroupIntro &&
@@ -440,7 +451,22 @@ export async function runReplyAgent(params: {
     // Otherwise, a late typing trigger (e.g. from a tool callback) can outlive the run and
     // keep the typing indicator stuck.
     if (payloadArray.length === 0) {
-      return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
+      if (runErrorFallbackPayload && overflowRecoveryErrorKind && isDiagnosticsEnabled(cfg)) {
+        emitDiagnosticEvent({
+          type: "overflow.recovery",
+          runId: opts?.runId ?? followupRun.run.sessionId,
+          sessionKey,
+          sessionId: followupRun.run.sessionId,
+          provider: providerUsed,
+          model: modelUsed,
+          stage: "finalized",
+          branch: "fallback_payload_injected_after_empty",
+          outcome: "returned_error_payload",
+          errorKind: overflowRecoveryErrorKind,
+          reasonClass: "empty_payload_after_error",
+        });
+      }
+      return finalizeWithFollowup(runErrorFallbackPayload, queueKey, runFollowupTurn);
     }
 
     const payloadResult = buildReplyPayloads({
@@ -464,7 +490,22 @@ export async function runReplyAgent(params: {
     didLogHeartbeatStrip = payloadResult.didLogHeartbeatStrip;
 
     if (replyPayloads.length === 0) {
-      return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
+      if (runErrorFallbackPayload && overflowRecoveryErrorKind && isDiagnosticsEnabled(cfg)) {
+        emitDiagnosticEvent({
+          type: "overflow.recovery",
+          runId: opts?.runId ?? followupRun.run.sessionId,
+          sessionKey,
+          sessionId: followupRun.run.sessionId,
+          provider: providerUsed,
+          model: modelUsed,
+          stage: "finalized",
+          branch: "fallback_payload_injected_after_empty",
+          outcome: "returned_error_payload",
+          errorKind: overflowRecoveryErrorKind,
+          reasonClass: "empty_payload_after_error",
+        });
+      }
+      return finalizeWithFollowup(runErrorFallbackPayload, queueKey, runFollowupTurn);
     }
 
     const successfulCronAdds = runResult.successfulCronAdds ?? 0;
