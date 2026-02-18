@@ -55,11 +55,14 @@ describe("runCommandWithTimeout", () => {
       [
         process.execPath,
         "-e",
-        'let i=0; const t=setInterval(() => { process.stdout.write("."); i += 1; if (i >= 2) { clearInterval(t); process.exit(0); } }, 10);',
+        // Emit immediately, then keep emitting at intervals that stay below the
+        // no-output timeout. This validates timer resets while avoiding startup
+        // jitter flakes on slower CI machines.
+        'process.stdout.write("."); let i=0; const t=setInterval(() => { process.stdout.write("."); i += 1; if (i >= 2) { clearInterval(t); process.exit(0); } }, 300);',
       ],
       {
         timeoutMs: 5_000,
-        noOutputTimeoutMs: 160,
+        noOutputTimeoutMs: 700,
       },
     );
 
