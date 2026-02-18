@@ -587,7 +587,7 @@ describe("createOpenClawCodingTools", () => {
         limit: Type.Optional(Type.Number()),
       }),
       execute: vi.fn(async () => ({
-        content: [{ type: "text", text: "line-0001" }],
+        content: [{ type: "text" as const, text: "line-0001" }],
         details: {
           truncation: {
             truncated: true,
