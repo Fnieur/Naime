@@ -586,7 +586,7 @@ describe("createOpenClawCodingTools", () => {
         offset: Type.Optional(Type.Number()),
         limit: Type.Optional(Type.Number()),
       }),
-      execute: vi.fn(async () => ({
+      execute: vi.fn(async (_toolCallId: string, _params: unknown) => ({
         content: [{ type: "text", text: "line-0001" }],
         details: {
           truncation: {
@@ -596,7 +596,7 @@ describe("createOpenClawCodingTools", () => {
             content: "hidden duplicate payload",
           },
         },
-      })),
+      })) as AgentTool["execute"],
     };
 
     const wrapped = createOpenClawReadTool(
