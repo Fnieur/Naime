@@ -1,0 +1,21 @@
+name: PR Triage
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Triage PR
+        uses: pranayom/security_pr@4d4682c850ad4566c2ab0ab9016a9ac2e09e3fe0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          vision_document: .github/openclaw-vision.yaml
+          openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          post_comment: "true"
