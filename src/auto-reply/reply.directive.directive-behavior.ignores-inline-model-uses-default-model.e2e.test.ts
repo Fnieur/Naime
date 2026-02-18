@@ -97,7 +97,7 @@ describe("directive behavior", () => {
       expect(call?.thinkLevel).toBe("low");
     });
   });
-  it("passes elevated defaults when sender is approved", async () => {
+  it("defaults elevated mode to off when enabled and sender is approved", async () => {
     await withTempHome(async (home) => {
       const storePath = path.join(home, "sessions.json");
       vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
@@ -126,6 +126,56 @@ describe("directive behavior", () => {
           },
           tools: {
             elevated: {
+              enabled: true,
+              allowFrom: { whatsapp: ["+1004"] },
+            },
+          },
+          channels: { whatsapp: { allowFrom: ["*"] } },
+          session: { store: storePath },
+        },
+      );
+
+      expect(runEmbeddedPiAgent).toHaveBeenCalledOnce();
+      const call = vi.mocked(runEmbeddedPiAgent).mock.calls[0]?.[0];
+      expect(call?.bashElevated).toEqual({
+        enabled: true,
+        allowed: true,
+        defaultLevel: "off",
+      });
+    });
+  });
+
+  it("respects explicit elevatedDefault=on when enabled and sender is approved", async () => {
+    await withTempHome(async (home) => {
+      const storePath = path.join(home, "sessions.json");
+      vi.mocked(runEmbeddedPiAgent).mockResolvedValue({
+        payloads: [{ text: "done" }],
+        meta: {
+          durationMs: 5,
+          agentMeta: { sessionId: "s", provider: "p", model: "m" },
+        },
+      });
+
+      await getReplyFromConfig(
+        {
+          Body: "hello",
+          From: "+1004",
+          To: "+2000",
+          Provider: "whatsapp",
+          SenderE164: "+1004",
+        },
+        {},
+        {
+          agents: {
+            defaults: {
+              model: { primary: "anthropic/claude-opus-4-5" },
+              workspace: path.join(home, "openclaw"),
+              elevatedDefault: "on",
+            },
+          },
+          tools: {
+            elevated: {
+              enabled: true,
               allowFrom: { whatsapp: ["+1004"] },
             },
           },
