@@ -123,6 +123,8 @@ export async function gatherDaemonStatus(
     command,
   });
 
+  // Merge service env (systemd: unit + drop-ins + EnvironmentFile=) so probe uses
+  // the same OPENCLAW_GATEWAY_TOKEN / config path the gateway process sees.
   const serviceEnv = command?.environment ?? undefined;
   const mergedDaemonEnv = {
     ...(process.env as Record<string, string | undefined>),

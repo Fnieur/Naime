@@ -49,6 +49,109 @@ export { enableSystemdUserLinger, readSystemdUserLingerStatus };
 export type { SystemdUserLingerStatus };
 
 // Unit file parsing/rendering: see systemd-unit.ts
+// EnvironmentFile= and drop-in parsing: so daemon status probe uses the same
+// env the gateway process sees (avoids token/config mismatch with user overrides).
+
+type ServiceSectionParsed = {
+  execStart: string;
+  workingDirectory: string;
+  envAssignments: Array<{ key: string; value: string }>;
+  envFilePaths: Array<{ path: string; optional: boolean }>;
+};
+
+function parseSystemdServiceSection(content: string): Omit<ServiceSectionParsed, "execStart"> & { execStart?: string } {
+  let execStart: string | undefined;
+  let workingDirectory = "";
+  const envAssignments: Array<{ key: string; value: string }> = [];
+  const envFilePaths: Array<{ path: string; optional: boolean }> = [];
+  let inService = false;
+  for (const rawLine of content.split("\n")) {
+    const line = rawLine.trim();
+    if (line.startsWith("[")) {
+      inService = line === "[Service]";
+      continue;
+    }
+    if (!inService || !line || line.startsWith("#")) {
+      continue;
+    }
+    if (line.startsWith("ExecStart=")) {
+      execStart = line.slice("ExecStart=".length).trim();
+    } else if (line.startsWith("WorkingDirectory=")) {
+      workingDirectory = line.slice("WorkingDirectory=".length).trim();
+    } else if (line.startsWith("Environment=")) {
+      const raw = line.slice("Environment=".length).trim();
+      const parsed = parseSystemdEnvAssignment(raw);
+      if (parsed) {
+        envAssignments.push(parsed);
+      }
+    } else if (line.startsWith("EnvironmentFile=")) {
+      const raw = line.slice("EnvironmentFile=".length).trim();
+      const optional = raw.startsWith("-");
+      const filePath = (optional ? raw.slice(1) : raw).trim();
+      if (filePath) {
+        envFilePaths.push({ path: filePath, optional });
+      }
+    }
+  }
+  return { execStart: execStart ?? "", workingDirectory, envAssignments, envFilePaths };
+}
+
+/** Parse KEY=VALUE lines; supports KEY="val" and KEY='val'. No variable expansion. */
+function parseEnvFileContent(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    const eq = line.indexOf("=");
+    if (eq <= 0) {
+      continue;
+    }
+    const key = line.slice(0, eq).trim();
+    if (!key) {
+      continue;
+    }
+    let value = line.slice(eq + 1);
+    if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+      value = value.slice(1, -1).replace(/\\"/g, '"');
+    } else if (value.startsWith("'") && value.endsWith("'") && value.length >= 2) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+function resolveEnvFilePath(unitDir: string, rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (path.isAbsolute(trimmed)) {
+    return trimmed;
+  }
+  return path.resolve(unitDir, trimmed);
+}
+
+async function loadEnvFile(
+  unitDir: string,
+  entry: { path: string; optional: boolean },
+): Promise<Record<string, string>> {
+  const resolved = resolveEnvFilePath(unitDir, entry.path);
+  try {
+    const content = await fs.readFile(resolved, "utf8");
+    return parseEnvFileContent(content);
+  } catch {
+    if (entry.optional) {
+      return {};
+    }
+    throw new Error(`EnvironmentFile not found: ${resolved}`);
+  }
+}
+
+function mergeEnvInto(target: Record<string, string>, source: Record<string, string>): void {
+  for (const [k, v] of Object.entries(source)) {
+    target[k] = v;
+  }
+}
 
 export async function readSystemdServiceExecStart(
   env: Record<string, string | undefined>,
@@ -59,35 +162,46 @@ export async function readSystemdServiceExecStart(
   sourcePath?: string;
 } | null> {
   const unitPath = resolveSystemdUnitPath(env);
+  const unitDir = path.dirname(unitPath);
   try {
     const content = await fs.readFile(unitPath, "utf8");
-    let execStart = "";
-    let workingDirectory = "";
-    const environment: Record<string, string> = {};
-    for (const rawLine of content.split("\n")) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#")) {
-        continue;
-      }
-      if (line.startsWith("ExecStart=")) {
-        execStart = line.slice("ExecStart=".length).trim();
-      } else if (line.startsWith("WorkingDirectory=")) {
-        workingDirectory = line.slice("WorkingDirectory=".length).trim();
-      } else if (line.startsWith("Environment=")) {
-        const raw = line.slice("Environment=".length).trim();
-        const parsed = parseSystemdEnvAssignment(raw);
-        if (parsed) {
-          environment[parsed.key] = parsed.value;
-        }
-      }
-    }
-    if (!execStart) {
+    const main = parseSystemdServiceSection(content);
+    if (!main.execStart) {
       return null;
     }
-    const programArguments = parseSystemdExecStart(execStart);
+    const environment: Record<string, string> = {};
+    for (const a of main.envAssignments) {
+      environment[a.key] = a.value;
+    }
+    for (const entry of main.envFilePaths) {
+      const loaded = await loadEnvFile(unitDir, entry);
+      mergeEnvInto(environment, loaded);
+    }
+    const dropInDir = `${unitPath}.d`;
+    let dropInFiles: string[] = [];
+    try {
+      const names = await fs.readdir(dropInDir);
+      dropInFiles = names.filter((n) => n.endsWith(".conf")).sort();
+    } catch {
+      // no drop-in dir or not readable
+    }
+    for (const name of dropInFiles) {
+      const dropInPath = path.join(dropInDir, name);
+      const dropInContent = await fs.readFile(dropInPath, "utf8");
+      const drop = parseSystemdServiceSection(dropInContent);
+      for (const a of drop.envAssignments) {
+        environment[a.key] = a.value;
+      }
+      const dropInDirPosix = path.dirname(dropInPath);
+      for (const entry of drop.envFilePaths) {
+        const loaded = await loadEnvFile(dropInDirPosix, entry);
+        mergeEnvInto(environment, loaded);
+      }
+    }
+    const programArguments = parseSystemdExecStart(main.execStart);
     return {
       programArguments,
-      ...(workingDirectory ? { workingDirectory } : {}),
+      ...(main.workingDirectory ? { workingDirectory: main.workingDirectory } : {}),
       ...(Object.keys(environment).length > 0 ? { environment } : {}),
       sourcePath: unitPath,
     };
