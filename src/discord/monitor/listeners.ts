@@ -1,4 +1,5 @@
 import {
+  ChannelDeleteListener,
   ChannelType,
   type Client,
   MessageCreateListener,
@@ -438,5 +439,135 @@ export class DiscordPresenceListener extends PresenceUpdateListener {
       const logger = this.logger ?? discordEventQueueLog;
       logger.error(danger(`discord presence handler failed: ${String(err)}`));
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Channel Delete — clean up orphaned sessions when a Discord channel is removed
+// ---------------------------------------------------------------------------
+
+type ChannelDeleteEvent = Parameters<ChannelDeleteListener["handle"]>[0];
+
+export type DiscordChannelDeleteListenerParams = {
+  cfg: LoadedConfig;
+  logger: Logger;
+};
+
+export class DiscordChannelDeleteListener extends ChannelDeleteListener {
+  constructor(private params: DiscordChannelDeleteListenerParams) {
+    super();
+  }
+
+  async handle(data: ChannelDeleteEvent, _client: Client) {
+    const startedAt = Date.now();
+    try {
+      await handleDiscordChannelDelete({
+        data,
+        cfg: this.params.cfg,
+        logger: this.params.logger,
+      });
+    } catch (err) {
+      this.params.logger.error(danger(`discord channel-delete handler failed: ${String(err)}`));
+    } finally {
+      logSlowDiscordListener({
+        logger: this.params.logger,
+        listener: this.constructor.name,
+        event: this.type,
+        durationMs: Date.now() - startedAt,
+      });
+    }
+  }
+}
+
+async function handleDiscordChannelDelete(params: {
+  data: ChannelDeleteEvent;
+  cfg: LoadedConfig;
+  logger: Logger;
+}) {
+  // The raw channel ID is available from the underlying dispatch data.
+  // Carbon's parsed data wraps it as `data.channel`, but the raw `id` field
+  // from GatewayChannelDeleteDispatchData is also present on the object.
+  const channelId =
+    "id" in params.data && typeof params.data.id === "string"
+      ? params.data.id
+      : (params.data as Record<string, unknown>).channel &&
+          typeof (params.data as Record<string, unknown>).channel === "object" &&
+          "id" in ((params.data as Record<string, unknown>).channel as Record<string, unknown>)
+        ? String(((params.data as Record<string, unknown>).channel as Record<string, string>).id)
+        : undefined;
+
+  if (!channelId) {
+    params.logger.warn("discord channel-delete: could not resolve channel ID from event data");
+    return;
+  }
+
+  // Lazily import session store utilities to avoid circular dependencies
+  // and keep the listener module lightweight.
+  const { listAgentIds } = await import("../../agents/agent-scope.js");
+  const { loadSessionStore, resolveStorePath, updateSessionStore } =
+    await import("../../config/sessions.js");
+  const { archiveSessionTranscripts } = await import("../../gateway/session-utils.fs.js");
+
+  const agentIds = listAgentIds(params.cfg);
+  const suffix = `discord:channel:${channelId}`;
+
+  let totalDeleted = 0;
+
+  for (const agentId of agentIds) {
+    const storePath = resolveStorePath(params.cfg.session?.store, { agentId });
+    const store = loadSessionStore(storePath);
+
+    // Find all session keys for this channel across this agent.
+    const matchingKeys = Object.keys(store).filter((key) => key.endsWith(suffix));
+
+    if (matchingKeys.length === 0) {
+      continue;
+    }
+
+    // Collect session info before deleting (needed for transcript cleanup).
+    const sessionsToArchive: Array<{
+      sessionId?: string;
+      sessionFile?: string;
+    }> = [];
+
+    for (const key of matchingKeys) {
+      const entry = store[key];
+      if (entry) {
+        sessionsToArchive.push({
+          sessionId: entry.sessionId,
+          sessionFile: entry.sessionFile,
+        });
+      }
+    }
+
+    // Remove matching entries from the session store.
+    await updateSessionStore(storePath, (currentStore) => {
+      for (const key of matchingKeys) {
+        if (currentStore[key]) {
+          delete currentStore[key];
+        }
+      }
+    });
+
+    // Archive transcripts (best-effort).
+    for (const session of sessionsToArchive) {
+      if (session.sessionId) {
+        archiveSessionTranscripts({
+          sessionId: session.sessionId,
+          storePath,
+          sessionFile: session.sessionFile,
+          agentId,
+          reason: "deleted",
+        });
+      }
+    }
+
+    totalDeleted += matchingKeys.length;
+  }
+
+  if (totalDeleted > 0) {
+    params.logger.info(
+      `discord channel-delete: cleaned up ${totalDeleted} session(s) for deleted channel ${channelId}`,
+    );
   }
 }

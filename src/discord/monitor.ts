@@ -16,8 +16,12 @@ export {
   resolveGroupDmAllow,
   shouldEmitDiscordReactionNotification,
 } from "./monitor/allow-list.js";
-export type { DiscordMessageEvent, DiscordMessageHandler } from "./monitor/listeners.js";
-export { registerDiscordListener } from "./monitor/listeners.js";
+export type {
+  DiscordMessageEvent,
+  DiscordMessageHandler,
+  DiscordChannelDeleteListenerParams,
+} from "./monitor/listeners.js";
+export { DiscordChannelDeleteListener, registerDiscordListener } from "./monitor/listeners.js";
 
 export { createDiscordMessageHandler } from "./monitor/message-handler.js";
 export { buildDiscordMediaPayload } from "./monitor/message-utils.js";
