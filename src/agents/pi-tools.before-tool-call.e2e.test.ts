@@ -225,7 +225,14 @@ describe("before_tool_call hook integration for client tools", () => {
       { agentId: "main", sessionKey: "main" },
     );
     const extensionContext = {} as Parameters<typeof tool.execute>[4];
-    await tool.execute("client-call-1", { value: "ok" }, undefined, undefined, extensionContext);
+    const beforeToolUpdate = undefined as unknown as Parameters<typeof tool.execute>[3];
+    await tool.execute(
+      "client-call-1",
+      { value: "ok" },
+      undefined,
+      beforeToolUpdate,
+      extensionContext,
+    );
 
     expect(onClientToolCall).toHaveBeenCalledWith("client_tool", {
       value: "ok",
