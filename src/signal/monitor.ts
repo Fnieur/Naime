@@ -14,7 +14,7 @@ import { spawnSignalDaemon } from "./daemon.js";
 import { isSignalSenderAllowed, type resolveSignalSender } from "./identity.js";
 import { createSignalEventHandler } from "./monitor/event-handler.js";
 import { sendMessageSignal } from "./send.js";
-import { runSignalSseLoop } from "./sse-reconnect.js";
+import { runSignalReceiveLoop } from "./sse-reconnect.js";
 
 type SignalReactionMessage = {
   emoji?: string | null;
@@ -369,7 +369,7 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
       buildSignalReactionSystemEventText,
     });
 
-    await runSignalSseLoop({
+    await runSignalReceiveLoop({
       baseUrl,
       account,
       abortSignal: opts.abortSignal,
