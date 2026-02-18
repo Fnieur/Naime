@@ -122,6 +122,9 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
     waitForIdle: () => sendChain,
   });
 
+  // Separate chains for block replies vs tool/final to allow parallel delivery
+  let blockChain: Promise<void> = Promise.resolve();
+
   const enqueue = (kind: ReplyDispatchKind, payload: ReplyPayload) => {
     const normalized = normalizeReplyPayloadInternal(payload, {
       responsePrefix: options.responsePrefix,
@@ -142,6 +145,35 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
       sentFirstBlock = true;
     }
 
+    // Block replies get their own parallel chain to allow streaming while tools execute
+    if (kind === "block") {
+      blockChain = blockChain
+        .then(async () => {
+          if (shouldDelay) {
+            const delayMs = getHumanDelay(options.humanDelay);
+            if (delayMs > 0) {
+              await sleep(delayMs);
+            }
+          }
+          await options.deliver(normalized, { kind });
+        })
+        .catch((err) => {
+          options.onError?.(err, { kind });
+        })
+        .finally(() => {
+          pending -= 1;
+          if (pending === 1 && completeCalled) {
+            pending -= 1;
+          }
+          if (pending === 0) {
+            unregister();
+            options.onIdle?.();
+          }
+        });
+      return true;
+    }
+
+    // Tool and final replies use the main chain (preserves order)
     sendChain = sendChain
       .then(async () => {
         // Add human-like delay between block replies for natural rhythm.
@@ -200,7 +232,7 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
     sendToolResult: (payload) => enqueue("tool", payload),
     sendBlockReply: (payload) => enqueue("block", payload),
     sendFinalReply: (payload) => enqueue("final", payload),
-    waitForIdle: () => sendChain,
+    waitForIdle: () => Promise.all([sendChain, blockChain]).then(() => {}),
     getQueuedCounts: () => ({ ...queuedCounts }),
     markComplete,
   };
