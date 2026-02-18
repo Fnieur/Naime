@@ -25,6 +25,7 @@ import { usageHandlers } from "./server-methods/usage.js";
 import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
+import { wsMetricsHandlers } from "./server-methods/ws-metrics.js";
 
 const ADMIN_SCOPE = "operator.admin";
 const READ_SCOPE = "operator.read";
@@ -52,6 +53,7 @@ const PAIRING_METHODS = new Set([
   "node.rename",
 ]);
 const ADMIN_METHOD_PREFIXES = ["exec.approvals."];
+const ADMIN_METHODS = new Set(["ws.clients"]);
 const READ_METHODS = new Set([
   "health",
   "logs.tail",
@@ -78,6 +80,7 @@ const READ_METHODS = new Set([
   "chat.history",
   "config.get",
   "talk.config",
+  "ws.metrics",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -141,6 +144,9 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   if (WRITE_METHODS.has(method)) {
     return null;
   }
+  if (ADMIN_METHODS.has(method)) {
+    return errorShape(ErrorCodes.INVALID_REQUEST, "missing scope: operator.admin");
+  }
   if (ADMIN_METHOD_PREFIXES.some((prefix) => method.startsWith(prefix))) {
     return errorShape(ErrorCodes.INVALID_REQUEST, "missing scope: operator.admin");
   }
@@ -194,6 +200,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentHandlers,
   ...agentsHandlers,
   ...browserHandlers,
+  ...wsMetricsHandlers,
 };
 
 export async function handleGatewayRequest(
