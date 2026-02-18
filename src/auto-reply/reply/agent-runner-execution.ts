@@ -269,7 +269,14 @@ export async function runAgentTurnWithFallback(params: {
             hasRepliedRef: params.opts?.hasRepliedRef,
           });
           const senderContext = buildTemplateSenderContext(params.sessionCtx);
-          return runEmbeddedPiAgent({
+          // Wrap in safety net: if runEmbeddedPiAgent throws before its
+          // internal subscribe handlers emit lifecycle:end/error, WS clients
+          // would hang forever. Mirror the CLI path's lifecycleTerminalEmitted
+          // guard to guarantee a terminal lifecycle event is always emitted.
+          return (async () => {
+            const embeddedStartedAt = Date.now();
+            try {
+              return await runEmbeddedPiAgent({
             ...embeddedContext,
             groupId: resolveGroupSessionKey(params.sessionCtx)?.id,
             groupChannel:
@@ -406,6 +413,24 @@ export async function runAgentTurnWithFallback(params: {
                 }
               : undefined,
           });
+            } catch (err) {
+              // Safety net: emit lifecycle:error so server-chat.ts can deliver
+              // chat:final to WS clients. If the embedded agent's own subscribe
+              // handlers already emitted lifecycle:end/error, the duplicate event
+              // is harmless (context is already cleared, so it will be a no-op).
+              emitAgentEvent({
+                runId,
+                stream: "lifecycle",
+                data: {
+                  phase: "error",
+                  startedAt: embeddedStartedAt,
+                  endedAt: Date.now(),
+                  error: `Embedded Pi run failed: ${String(err)}`,
+                },
+              });
+              throw err;
+            }
+          })();
         },
       });
       runResult = fallbackResult.result;
