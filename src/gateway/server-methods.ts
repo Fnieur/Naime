@@ -100,6 +100,9 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   if (!client?.connect) {
     return null;
   }
+  if (method === "health") {
+    return null;
+  }
   const role = client.connect.role ?? "operator";
   const scopes = client.connect.scopes ?? [];
   if (NODE_ROLE_METHODS.has(method)) {
