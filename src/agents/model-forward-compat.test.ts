@@ -94,3 +94,20 @@ describe("resolveForwardCompatModel — context window (#19633)", () => {
     expect(model).toBeUndefined();
   });
 });
+
+describe("resolveForwardCompatModel — Antigravity Opus 4.6 (#19633)", () => {
+  it("patches Antigravity Opus 4.6 contextWindow to 1M", () => {
+    const registry = createMockRegistry({
+      "google-antigravity/claude-opus-4-5": {
+        ...OPUS_45_TEMPLATE,
+        provider: "google-antigravity",
+      },
+    });
+
+    const model = resolveForwardCompatModel("google-antigravity", "claude-opus-4-6", registry);
+
+    expect(model).toBeDefined();
+    expect(model!.id).toBe("claude-opus-4-6");
+    expect(model!.contextWindow).toBe(1_000_000);
+  });
+});
