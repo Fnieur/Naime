@@ -644,7 +644,9 @@ export function getSessionDefaults(cfg: OpenClawConfig): GatewaySessionsDefaults
 
 export function resolveSessionModelRef(
   cfg: OpenClawConfig,
-  entry?: Pick<SessionEntry, "model" | "modelProvider" | "modelOverride" | "providerOverride">,
+  entry?:
+    | SessionEntry
+    | Pick<SessionEntry, "model" | "modelProvider" | "modelOverride" | "providerOverride">,
   agentId?: string,
 ): { provider: string; model: string } {
   const resolved = agentId
