@@ -33,8 +33,6 @@ describe("buildInboundMetaSystemPrompt", () => {
 
     const payload = parseInboundMetaPayload(prompt);
     expect(payload["schema"]).toBe("openclaw.inbound_meta.v1");
-    expect(payload["message_id"]).toBe("123");
-    expect(payload["message_id_full"]).toBeUndefined();
     expect(payload["reply_to_id"]).toBe("99");
     expect(payload["chat_id"]).toBe("telegram:5494292670");
     expect(payload["channel"]).toBe("telegram");
@@ -99,21 +97,6 @@ describe("buildInboundMetaSystemPrompt", () => {
     expect(payload["sender_id"]).toBeUndefined();
   });
 
-  it("keeps message_id_full only when it differs from message_id", () => {
-    const prompt = buildInboundMetaSystemPrompt({
-      MessageSid: "short-id",
-      MessageSidFull: "full-provider-message-id",
-      OriginatingTo: "channel:C1",
-      OriginatingChannel: "slack",
-      Provider: "slack",
-      Surface: "slack",
-      ChatType: "group",
-    } as TemplateContext);
-
-    const payload = parseInboundMetaPayload(prompt);
-    expect(payload["message_id"]).toBe("short-id");
-    expect(payload["message_id_full"]).toBe("full-provider-message-id");
-  });
 });
 
 describe("buildInboundUserContextPrefix", () => {
