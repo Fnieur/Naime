@@ -1,0 +1,34 @@
+{
+  "name": "@openclaw/xmtp",
+  "version": "2026.2.16",
+  "description": "OpenClaw XMTP channel plugin for E2E encrypted wallet-to-wallet messaging",
+  "type": "module",
+  "dependencies": {
+    "@xmtp/agent-sdk": "^2.2.0",
+    "viem": "^2.23.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "channel": {
+      "id": "xmtp",
+      "label": "XMTP",
+      "selectionLabel": "XMTP (E2E Encrypted DMs)",
+      "docsPath": "/channels/xmtp",
+      "docsLabel": "xmtp",
+      "blurb": "E2E encrypted messaging via XMTP protocol; wallet-to-wallet.",
+      "order": 101,
+      "quickstartAllowFrom": true
+    },
+    "install": {
+      "npmSpec": "@openclaw/xmtp",
+      "localPath": "extensions/xmtp",
+      "defaultChoice": "npm"
+    }
+  }
+}
