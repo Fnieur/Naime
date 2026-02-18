@@ -77,10 +77,12 @@ import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
+  getCurrentChannelBeingProbed,
   getHealthCache,
   getHealthVersion,
   getPresenceVersion,
   incrementPresenceVersion,
+  isHealthRefreshInProgress,
   refreshGatewayHealthSnapshot,
 } from "./server/health-state.js";
 import { loadGatewayTlsRuntime } from "./server/tls.js";
@@ -564,6 +566,8 @@ export async function startGatewayServer(
       execApprovalManager,
       loadGatewayModelCatalog,
       getHealthCache,
+      getCurrentChannelBeingProbed,
+      isHealthRefreshInProgress,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
       logHealth,
       logGateway: log,
