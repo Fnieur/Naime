@@ -3,6 +3,7 @@ import type { SessionScope } from "./types.js";
 import {
   buildAgentMainSessionKey,
   DEFAULT_AGENT_ID,
+  normalizeSessionKeyForStorage,
   normalizeMainKey,
 } from "../../routing/session-key.js";
 import { normalizeE164 } from "../../utils.js";
@@ -28,7 +29,7 @@ export function deriveSessionKey(scope: SessionScope, ctx: MsgContext) {
 export function resolveSessionKey(scope: SessionScope, ctx: MsgContext, mainKey?: string) {
   const explicit = ctx.SessionKey?.trim();
   if (explicit) {
-    return explicit.toLowerCase();
+    return normalizeSessionKeyForStorage(explicit);
   }
   const raw = deriveSessionKey(scope, ctx);
   if (scope === "global") {
