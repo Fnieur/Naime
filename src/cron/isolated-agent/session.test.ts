@@ -76,6 +76,28 @@ describe("resolveCronSession", () => {
     expect(result.isNewSession).toBe(true);
   });
 
+  it("preserves authProfileOverride from existing session entry", () => {
+    vi.mocked(loadSessionStore).mockReturnValue({
+      "agent:main:cron:test-job": {
+        sessionId: "old-session-id",
+        updatedAt: 1000,
+        authProfileOverride: "claude-max",
+        authProfileOverrideSource: "user",
+      },
+    });
+    vi.mocked(evaluateSessionFreshness).mockReturnValue({ fresh: true });
+
+    const result = resolveCronSession({
+      cfg: {} as OpenClawConfig,
+      sessionKey: "agent:main:cron:test-job",
+      agentId: "main",
+      nowMs: Date.now(),
+    });
+
+    expect(result.sessionEntry.authProfileOverride).toBe("claude-max");
+    expect(result.sessionEntry.authProfileOverrideSource).toBe("user");
+  });
+
   // New tests for session reuse behavior (#18027)
   describe("session reuse for webhooks/cron", () => {
     it("reuses existing sessionId when session is fresh", () => {
