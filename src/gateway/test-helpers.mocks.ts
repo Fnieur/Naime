@@ -142,6 +142,7 @@ const createStubPluginRegistry = (): PluginRegistry => ({
   cliRegistrars: [],
   services: [],
   commands: [],
+  streamFnWrappers: [],
   diagnostics: [],
 });
 
