@@ -30,9 +30,11 @@ function textResponse(body: string): Response {
 }
 
 function setMockFetch(
-  impl: FetchMock = async (_input: RequestInfo | URL, _init?: RequestInit) => textResponse(""),
-) {
-  const fetchSpy = vi.fn<FetchMock>(impl);
+  impl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+): FetchMock {
+  const fetchSpy = impl
+    ? vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(impl)
+    : vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
   global.fetch = withFetchPreconnect(fetchSpy);
   return fetchSpy;
 }
