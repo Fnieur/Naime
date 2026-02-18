@@ -72,6 +72,8 @@ export async function doctorCommand(
   printWizardHeader(runtime);
   intro("OpenClaw doctor");
 
+  let hasErrors = false;
+
   const root = await resolveOpenClawPackageRoot({
     moduleUrl: import.meta.url,
     argv1: process.argv[1],
@@ -110,6 +112,7 @@ export async function doctorCommand(
       lines.push(`Missing config: run ${formatCliCommand("openclaw setup")} first.`);
     }
     note(lines.join("\n"), "Gateway");
+    hasErrors = true;
   }
 
   cfg = await maybeRepairAnthropicOAuthProfileId(cfg, prompter);
@@ -274,6 +277,9 @@ export async function doctorCommand(
     cfg,
     timeoutMs: options.nonInteractive === true ? 3000 : 10_000,
   });
+  if (!healthOk) {
+    hasErrors = true;
+  }
   await maybeRepairGatewayDaemon({
     cfg,
     runtime,
@@ -311,6 +317,13 @@ export async function doctorCommand(
       const path = issue.path || "<root>";
       runtime.error(`- ${path}: ${issue.message}`);
     }
+    hasErrors = true;
+  }
+
+  if (hasErrors) {
+    outro("Doctor complete with errors.");
+    runtime.exit(1);
+    return;
   }
 
   outro("Doctor complete.");
