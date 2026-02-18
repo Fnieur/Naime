@@ -30,12 +30,12 @@ vi.mock("./session-utils.js", () => ({
 }));
 
 import type { CliDeps } from "../cli/deps.js";
-import type { HealthSummary } from "../commands/health.js";
-import type { NodeEventContext } from "./server-node-events-types.js";
 import { agentCommand } from "../commands/agent.js";
+import type { HealthSummary } from "../commands/health.js";
 import { updateSessionStore } from "../config/sessions.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
+import type { NodeEventContext } from "./server-node-events-types.js";
 import { handleNodeEvent } from "./server-node-events.js";
 import { loadSessionEntry } from "./session-utils.js";
 
@@ -280,9 +280,12 @@ describe("agent request events", () => {
       update({});
     });
     loadSessionEntryMock.mockImplementation((sessionKey: string) => ({
+      cfg: { session: { mainKey: "agent:main:main" } } as never,
       storePath: "/tmp/sessions.json",
-      entry: { sessionId: `sid-${sessionKey}` },
+      store: {} as never,
+      entry: { sessionId: `sid-${sessionKey}`, updatedAt: 0 },
       canonicalKey: sessionKey,
+      legacyKey: undefined,
     }));
   });
 
@@ -317,13 +320,17 @@ describe("agent request events", () => {
   it("reuses the current session route when delivery target is omitted", async () => {
     const ctx = buildCtx();
     loadSessionEntryMock.mockReturnValueOnce({
+      cfg: { session: { mainKey: "agent:main:main" } } as never,
       storePath: "/tmp/sessions.json",
+      store: {} as never,
       entry: {
         sessionId: "sid-current",
-        lastChannel: "telegram",
+        updatedAt: 0,
+        lastChannel: "telegram" as never,
         lastTo: "123",
       },
       canonicalKey: "agent:main:main",
+      legacyKey: undefined,
     });
 
     await handleNodeEvent(ctx, "node-route-hit", {

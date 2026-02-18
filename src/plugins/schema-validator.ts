@@ -11,7 +11,19 @@ type CachedValidator = {
   schema: Record<string, unknown>;
 };
 
+/**
+ * Maximum number of compiled validators to cache.
+ * Each entry holds a compiled AJV validator (a few KB).  500 entries is
+ * more than enough for any realistic plugin set while bounding memory.
+ */
+const MAX_SCHEMA_CACHE_SIZE = 500;
+
 const schemaCache = new Map<string, CachedValidator>();
+
+/** Clears the schema cache. Exported for use in tests only. */
+export function clearSchemaCache(): void {
+  schemaCache.clear();
+}
 
 function formatAjvErrors(errors: ErrorObject[] | null | undefined): string[] {
   if (!errors || errors.length === 0) {
@@ -31,8 +43,20 @@ export function validateJsonSchemaValue(params: {
 }): { ok: true } | { ok: false; errors: string[] } {
   let cached = schemaCache.get(params.cacheKey);
   if (!cached || cached.schema !== params.schema) {
+    // Evict the oldest entry when at capacity (LRU via Map insertion order).
+    if (!schemaCache.has(params.cacheKey) && schemaCache.size >= MAX_SCHEMA_CACHE_SIZE) {
+      const oldest = schemaCache.keys().next().value;
+      if (oldest) {
+        schemaCache.delete(oldest);
+      }
+    }
     const validate = ajv.compile(params.schema);
     cached = { validate, schema: params.schema };
+    schemaCache.set(params.cacheKey, cached);
+  } else {
+    // Refresh recency: move key to end of insertion order so Map-based LRU
+    // eviction skips frequently-used entries (delete + re-set pattern).
+    schemaCache.delete(params.cacheKey);
     schemaCache.set(params.cacheKey, cached);
   }
 

@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const sendMessageMatrixMock = vi.hoisted(() => vi.fn().mockResolvedValue({ messageId: "mx-1" }));
 
 vi.mock("../send.js", () => ({
-  sendMessageMatrix: (...args: unknown[]) => sendMessageMatrixMock(...args),
+  sendMessageMatrix: (...args: Parameters<typeof sendMessageMatrixMock>) =>
+    sendMessageMatrixMock(...args),
 }));
 
 import { setMatrixRuntime } from "../../runtime.js";
@@ -20,14 +21,18 @@ describe("deliverMatrixReplies", () => {
 
   const runtimeStub = {
     config: {
-      loadConfig: (...args: unknown[]) => loadConfigMock(...args),
+      loadConfig: (...args: Parameters<typeof loadConfigMock>) => loadConfigMock(...args),
     },
     channel: {
       text: {
-        resolveMarkdownTableMode: (...args: unknown[]) => resolveMarkdownTableModeMock(...args),
-        convertMarkdownTables: (...args: unknown[]) => convertMarkdownTablesMock(...args),
-        resolveChunkMode: (...args: unknown[]) => resolveChunkModeMock(...args),
-        chunkMarkdownTextWithMode: (...args: unknown[]) => chunkMarkdownTextWithModeMock(...args),
+        resolveMarkdownTableMode: (...args: Parameters<typeof resolveMarkdownTableModeMock>) =>
+          resolveMarkdownTableModeMock(...args),
+        convertMarkdownTables: (...args: Parameters<typeof convertMarkdownTablesMock>) =>
+          convertMarkdownTablesMock(...args),
+        resolveChunkMode: (...args: Parameters<typeof resolveChunkModeMock>) =>
+          resolveChunkModeMock(...args),
+        chunkMarkdownTextWithMode: (...args: Parameters<typeof chunkMarkdownTextWithModeMock>) =>
+          chunkMarkdownTextWithModeMock(...args),
       },
     },
     logging: {
