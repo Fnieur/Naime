@@ -44,6 +44,10 @@ Docs: https://docs.openclaw.ai
 - Feishu: add Bitable create-app/create-field tools for automation workflows. (#17963) Thanks @gaowanqi08141999.
 - Docker: add optional `OPENCLAW_INSTALL_BROWSER` build arg to preinstall Chromium + Xvfb in the Docker image, avoiding runtime Playwright installs. (#18449)
 
+### Changes
+
+- Android: add timeout constant and exponential backoff to gateway discovery; prevents freezes when gateways are offline. (#9744) Thanks @hubertusgbecker.
+
 ### Fixes
 
 - Agents/Image: collapse resize diagnostics to one line per image and include visible pixel/byte size details in the log message for faster triage.
