@@ -102,6 +102,11 @@ function createCompactionDiagId(): string {
   return `ovf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function isRecoverableUnhandledStopReasonError(error: unknown): boolean {
+  const text = describeUnknownError(error);
+  return /Unhandled stop reason:\s*(STOP|MAX_TOKENS)\b/i.test(text);
+}
+
 const hasUsageValues = (
   usage: ReturnType<typeof normalizeUsage>,
 ): usage is NonNullable<ReturnType<typeof normalizeUsage>> =>
@@ -532,14 +537,28 @@ export async function runEmbeddedPiAgent(
             enforceFinalTag: params.enforceFinalTag,
           });
 
-          const {
-            aborted,
-            promptError,
-            timedOut,
-            timedOutDuringCompaction,
-            sessionIdUsed,
-            lastAssistant,
-          } = attempt;
+          const { aborted, promptError, timedOut, timedOutDuringCompaction, sessionIdUsed } =
+            attempt;
+          let lastAssistant = attempt.lastAssistant;
+          const recoverableUnhandledStopReason =
+            !aborted &&
+            Boolean(promptError) &&
+            isRecoverableUnhandledStopReasonError(promptError) &&
+            (attempt.assistantTexts.length > 0 ||
+              (Array.isArray(lastAssistant?.content) && lastAssistant.content.length > 0));
+          const effectivePromptError = recoverableUnhandledStopReason ? null : promptError;
+          if (recoverableUnhandledStopReason) {
+            log.warn(
+              `recovering from unhandled stop reason for ${provider}/${modelId}; using streamed assistant content`,
+            );
+            if (lastAssistant && lastAssistant.stopReason === "error") {
+              lastAssistant = {
+                ...lastAssistant,
+                stopReason: "stop",
+                errorMessage: undefined,
+              };
+            }
+          }
           const lastAssistantUsage = normalizeUsage(lastAssistant?.usage as UsageLike);
           const attemptUsage = attempt.attemptUsage ?? lastAssistantUsage;
           mergeUsageIntoAccumulator(usageAccumulator, attemptUsage);
@@ -563,8 +582,8 @@ export async function runEmbeddedPiAgent(
 
           const contextOverflowError = !aborted
             ? (() => {
-                if (promptError) {
-                  const errorText = describeUnknownError(promptError);
+                if (effectivePromptError) {
+                  const errorText = describeUnknownError(effectivePromptError);
                   if (isLikelyContextOverflowError(errorText)) {
                     return { text: errorText, source: "promptError" as const };
                   }
@@ -743,8 +762,8 @@ export async function runEmbeddedPiAgent(
             };
           }
 
-          if (promptError && !aborted) {
-            const errorText = describeUnknownError(promptError);
+          if (effectivePromptError && !aborted) {
+            const errorText = describeUnknownError(effectivePromptError);
             // Handle role ordering errors with a user-friendly message
             if (/incorrect role information|roles must alternate/i.test(errorText)) {
               return {
@@ -835,7 +854,7 @@ export async function runEmbeddedPiAgent(
                 status: resolveFailoverStatus(promptFailoverReason ?? "unknown"),
               });
             }
-            throw promptError;
+            throw effectivePromptError;
           }
 
           const fallbackThinking = pickFallbackThinkingLevel({
@@ -969,7 +988,7 @@ export async function runEmbeddedPiAgent(
           const payloads = buildEmbeddedRunPayloads({
             assistantTexts: attempt.assistantTexts,
             toolMetas: attempt.toolMetas,
-            lastAssistant: attempt.lastAssistant,
+            lastAssistant,
             lastToolError: attempt.lastToolError,
             config: params.config,
             sessionKey: params.sessionKey ?? params.sessionId,
