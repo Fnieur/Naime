@@ -3,7 +3,12 @@ import { SessionManager } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { sanitizeSessionHistory } from "./pi-embedded-runner/google.js";
 
-type AssistantThinking = { type?: string; thinking?: string; thinkingSignature?: string };
+type AssistantThinking = {
+  type?: string;
+  thinking?: string;
+  thinkingSignature?: string;
+  signature?: string;
+};
 
 function getAssistantMessage(out: AgentMessage[]) {
   const assistant = out.find((msg) => (msg as { role?: string }).role === "assistant") as
@@ -49,19 +54,23 @@ describe("sanitizeSessionHistory (google thinking)", () => {
 
   it("keeps thinking blocks with signatures for Google models", async () => {
     const assistant = await sanitizeGoogleAssistantWithContent([
-      { type: "thinking", thinking: "reasoning", thinkingSignature: "sig" },
+      { type: "thinking", thinking: "reasoning", thinkingSignature: "AAAA" },
     ]);
+
     expect(assistant.content?.map((block) => block.type)).toEqual(["thinking"]);
     expect(assistant.content?.[0]?.thinking).toBe("reasoning");
-    expect(assistant.content?.[0]?.thinkingSignature).toBe("sig");
+    expect(assistant.content?.[0]?.thinkingSignature).toBe("AAAA");
+    expect(assistant.content?.[0]?.signature).toBe("AAAA");
   });
 
   it("keeps thinking blocks with Anthropic-style signatures for Google models", async () => {
     const assistant = await sanitizeGoogleAssistantWithContent([
-      { type: "thinking", thinking: "reasoning", signature: "sig" },
+      { type: "thinking", thinking: "reasoning", signature: "AAAA" },
     ]);
     expect(assistant.content?.map((block) => block.type)).toEqual(["thinking"]);
     expect(assistant.content?.[0]?.thinking).toBe("reasoning");
+    expect(assistant.content?.[0]?.thinkingSignature).toBe("AAAA");
+    expect(assistant.content?.[0]?.signature).toBe("AAAA");
   });
 
   it("drops unsigned thinking blocks for Antigravity Claude", async () => {
@@ -111,11 +120,17 @@ describe("sanitizeSessionHistory (google thinking)", () => {
     });
 
     const assistant = out.find((msg) => (msg as { role?: string }).role === "assistant") as {
-      content?: Array<{ type?: string; thinking?: string; thinkingSignature?: string }>;
+      content?: Array<{
+        type?: string;
+        thinking?: string;
+        thinkingSignature?: string;
+        signature?: string;
+      }>;
     };
     expect(assistant.content?.map((block) => block.type)).toEqual(["thinking"]);
     expect(assistant.content?.[0]?.thinking).toBe("reasoning");
     expect(assistant.content?.[0]?.thinkingSignature).toBe("c2ln");
+    expect(assistant.content?.[0]?.signature).toBe("c2ln");
   });
 
   it("preserves order for mixed assistant content", async () => {
@@ -225,7 +240,7 @@ describe("sanitizeSessionHistory (google thinking)", () => {
       {
         role: "assistant",
         content: [
-          { type: "thinking", thinking: "signed", thinkingSignature: "sig" },
+          { type: "thinking", thinking: "signed", thinkingSignature: "AAAA" },
           { type: "thinking", thinking: "unsigned" },
         ],
       },
