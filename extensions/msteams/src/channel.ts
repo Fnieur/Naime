@@ -122,7 +122,7 @@ export const msteamsPlugin: ChannelPlugin<ResolvedMSTeamsAccount> = {
         .filter(Boolean)
         .map((entry) => entry.toLowerCase()),
     resolveDefaultTo: ({ cfg }) =>
-      (cfg.channels?.msteams as { defaultTo?: string } | undefined)?.defaultTo?.trim() || undefined,
+      cfg.channels?.msteams?.defaultTo?.trim() || undefined,
   },
   security: {
     collectWarnings: ({ cfg }) => {

@@ -889,7 +889,6 @@ export const BlueBubblesAccountSchemaBase = z
     webhookPath: z.string().optional(),
     dmPolicy: DmPolicySchema.optional().default("pairing"),
     allowFrom: z.array(BlueBubblesAllowFromEntry).optional(),
-    defaultTo: z.string().optional(),
     groupAllowFrom: z.array(BlueBubblesAllowFromEntry).optional(),
     groupPolicy: GroupPolicySchema.optional().default("allowlist"),
     historyLimit: z.number().int().min(0).optional(),
