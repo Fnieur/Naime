@@ -11,6 +11,8 @@ import {
   resolveImplicitProviders,
 } from "./models-config.providers.js";
 
+const ENV_VAR_NAME_RE = /^[A-Z][A-Z0-9_]*$/;
+
 type ModelsConfig = NonNullable<OpenClawConfig["models"]>;
 
 const DEFAULT_MODE: NonNullable<ModelsConfig["mode"]> = "merge";
@@ -112,10 +114,10 @@ export async function ensureOpenClawModelsJson(
 
   let mergedProviders = providers;
   let existingRaw = "";
+  const existingParsed = await readJson(targetPath);
   if (mode === "merge") {
-    const existing = await readJson(targetPath);
-    if (isRecord(existing) && isRecord(existing.providers)) {
-      const existingProviders = existing.providers as Record<
+    if (isRecord(existingParsed) && isRecord(existingParsed.providers)) {
+      const existingProviders = existingParsed.providers as Record<
         string,
         NonNullable<ModelsConfig["providers"]>[string]
       >;
@@ -127,6 +129,27 @@ export async function ensureOpenClawModelsJson(
     providers: mergedProviders,
     agentDir,
   });
+
+  // Preserve env-var apiKey references from the existing models.json.
+  // When the user sets apiKey to an env-var name (e.g. "MINIMAX_API_KEY"),
+  // OpenClaw resolves it at runtime. Without this step, the resolved plaintext
+  // key would be written back, destroying the env-var reference.
+  if (isRecord(existingParsed) && isRecord(existingParsed.providers) && normalizedProviders) {
+    const existingProviders = existingParsed.providers as Record<string, ProviderConfig>;
+    for (const [key, provider] of Object.entries(normalizedProviders)) {
+      const existingProvider = existingProviders[key];
+      if (
+        existingProvider?.apiKey &&
+        ENV_VAR_NAME_RE.test(existingProvider.apiKey) &&
+        provider.apiKey &&
+        !ENV_VAR_NAME_RE.test(provider.apiKey)
+      ) {
+        // The original was an env-var name and the new value is a resolved secret — keep the original.
+        provider.apiKey = existingProvider.apiKey;
+      }
+    }
+  }
+
   const next = `${JSON.stringify({ providers: normalizedProviders }, null, 2)}\n`;
   try {
     existingRaw = await fs.readFile(targetPath, "utf8");
