@@ -163,6 +163,26 @@ describe("stripHeartbeatToken", () => {
       didStrip: true,
     });
   });
+
+  it("strips HEARTBEAT_OK from streaming during heartbeat runs (#16974)", () => {
+    const result = stripHeartbeatToken("HEARTBEAT_OK some short ack", {
+      mode: "heartbeat",
+    });
+    expect(result.didStrip).toBe(true);
+    expect(result.shouldSkip).toBe(true);
+  });
+
+  it("strips HEARTBEAT_OK from normal message streaming (#16974)", () => {
+    const result = stripHeartbeatToken(
+      "HEARTBEAT_OK Here is a full response that is long enough to keep",
+      {
+        mode: "message",
+      },
+    );
+    expect(result.didStrip).toBe(true);
+    expect(result.shouldSkip).toBe(false);
+    expect(result.text).toContain("Here is a full response");
+  });
 });
 
 describe("isHeartbeatContentEffectivelyEmpty", () => {
