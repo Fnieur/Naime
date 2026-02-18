@@ -321,7 +321,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     const agg = formatToolAggregate(toolName, meta ? [meta] : undefined, {
       markdown: useMarkdown,
     });
-    const { text: cleanedText, mediaUrls } = parseReplyDirectives(agg);
+    const { text: cleanedText, mediaUrls, audioAsVoice } = parseReplyDirectives(agg);
     if (!cleanedText && (!mediaUrls || mediaUrls.length === 0)) {
       return;
     }
@@ -329,6 +329,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       void params.onToolResult({
         text: cleanedText,
         mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
+        audioAsVoice: audioAsVoice || undefined,
       });
     } catch {
       // ignore tool result delivery failures
@@ -342,7 +343,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       markdown: useMarkdown,
     });
     const message = `${agg}\n${formatToolOutputBlock(output)}`;
-    const { text: cleanedText, mediaUrls } = parseReplyDirectives(message);
+    const { text: cleanedText, mediaUrls, audioAsVoice } = parseReplyDirectives(message);
     if (!cleanedText && (!mediaUrls || mediaUrls.length === 0)) {
       return;
     }
@@ -350,6 +351,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       void params.onToolResult({
         text: cleanedText,
         mediaUrls: mediaUrls?.length ? mediaUrls : undefined,
+        audioAsVoice: audioAsVoice || undefined,
       });
     } catch {
       // ignore tool result delivery failures
