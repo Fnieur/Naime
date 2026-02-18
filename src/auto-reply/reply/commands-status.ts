@@ -17,6 +17,7 @@ import {
   loadProviderUsageSummary,
   resolveUsageProviderId,
 } from "../../infra/provider-usage.js";
+import { resolveRouterConfig } from "../../hooks/pre-route.js";
 import type { MediaUnderstandingDecision } from "../../media-understanding/types.js";
 import { normalizeGroupActivation } from "../group-activation.js";
 import { buildStatusMessage } from "../status.js";
@@ -137,6 +138,10 @@ export async function buildStatusReply(params: {
     ? (normalizeGroupActivation(sessionEntry?.groupActivation) ?? defaultGroupActivation())
     : undefined;
   const agentDefaults = cfg.agents?.defaults ?? {};
+  const routerCfg = resolveRouterConfig(cfg);
+  const routerLine = routerCfg
+    ? `🔀 Routing: smart (${routerCfg.model ?? "default"} via ${routerCfg.provider ?? "ollama"})`
+    : undefined;
   const statusText = buildStatusMessage({
     config: cfg,
     agent: {
@@ -178,6 +183,7 @@ export async function buildStatusReply(params: {
     subagentsLine,
     mediaDecisions: params.mediaDecisions,
     includeTranscriptUsage: false,
+    routerLine,
   });
 
   return { text: statusText };
