@@ -146,6 +146,22 @@ export function parseModelRef(raw: string, defaultProvider: string): ModelRef | 
   return normalizeModelRef(providerRaw, model);
 }
 
+export function normalizeModelSelection(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const primary = (value as { primary?: unknown }).primary;
+  if (typeof primary === "string") {
+    const trimmed = primary.trim();
+    return trimmed || undefined;
+  }
+  return undefined;
+}
+
 export function resolveAllowlistModelKey(raw: string, defaultProvider: string): string | null {
   const parsed = parseModelRef(raw, defaultProvider);
   if (!parsed) {

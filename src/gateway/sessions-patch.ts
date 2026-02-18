@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { resolveAgentConfig, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
-import { resolveAllowedModelRef, resolveDefaultModelForAgent } from "../agents/model-selection.js";
+import {
+  normalizeModelSelection,
+  resolveAllowedModelRef,
+  resolveDefaultModelForAgent,
+} from "../agents/model-selection.js";
 import { normalizeGroupActivation } from "../auto-reply/group-activation.js";
 import {
   formatThinkingLevels,
@@ -54,22 +58,6 @@ function normalizeExecAsk(raw: string): "off" | "on-miss" | "always" | undefined
   const normalized = raw.trim().toLowerCase();
   if (normalized === "off" || normalized === "on-miss" || normalized === "always") {
     return normalized;
-  }
-  return undefined;
-}
-
-function normalizeModelSelection(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed || undefined;
-  }
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-  const primary = (value as { primary?: unknown }).primary;
-  if (typeof primary === "string") {
-    const trimmed = primary.trim();
-    return trimmed || undefined;
   }
   return undefined;
 }
