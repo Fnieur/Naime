@@ -22,6 +22,8 @@ import { buildAgentSessionKey } from "../../routing/resolve-route.js";
 import { resolveThreadSessionKeys } from "../../routing/session-key.js";
 import { buildUntrustedChannelMetadata } from "../../security/channel-metadata.js";
 import { truncateUtf16Safe } from "../../utils.js";
+import { createDiscordDraftStream } from "../draft-stream.js";
+import { editMessageDiscord } from "../send.messages.js";
 import { reactMessageDiscord, removeReactionDiscord } from "../send.js";
 import { normalizeDiscordSlug, resolveDiscordOwnerAllowFrom } from "./allow-list.js";
 import { resolveTimestampMs } from "./format.js";
@@ -607,10 +609,133 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
     },
   });
 
+  // --- Discord draft stream (edit-based preview streaming) ---
+  const discordStreamMode = discordConfig?.streamMode ?? "off";
+  const draftMaxChars = Math.min(textLimit, 2000);
+  const accountBlockStreamingEnabled =
+    typeof discordConfig?.blockStreaming === "boolean"
+      ? discordConfig.blockStreaming
+      : cfg.agents?.defaults?.blockStreamingDefault === "on";
+  const canStreamDraft = discordStreamMode === "partial" && !accountBlockStreamingEnabled;
+  const draftReplyToMessageId =
+    replyToMode !== "off" ? message.id : undefined;
+  const deliverChannelId = deliverTarget.startsWith("channel:")
+    ? deliverTarget.slice("channel:".length)
+    : messageChannelId;
+  const draftStream = canStreamDraft
+    ? createDiscordDraftStream({
+        rest: client.rest,
+        channelId: deliverChannelId,
+        maxChars: draftMaxChars,
+        replyToMessageId: draftReplyToMessageId,
+        minInitialChars: 30,
+        throttleMs: 1200,
+        log: logVerbose,
+        warn: logVerbose,
+      })
+    : undefined;
+  let lastPartialText = "";
+  let hasStreamedMessage = false;
+  let finalizedViaPreviewMessage = false;
+
+  const updateDraftFromPartial = (text?: string) => {
+    if (!draftStream || !text) {
+      return;
+    }
+    if (text === lastPartialText) {
+      return;
+    }
+    hasStreamedMessage = true;
+    // Keep the longer preview to avoid visible punctuation flicker.
+    if (
+      lastPartialText &&
+      lastPartialText.startsWith(text) &&
+      text.length < lastPartialText.length
+    ) {
+      return;
+    }
+    lastPartialText = text;
+    draftStream.update(text);
+  };
+
+  const flushDraft = async () => {
+    if (!draftStream) {
+      return;
+    }
+    await draftStream.flush();
+  };
+
+  // When draft streaming is active, suppress block streaming to avoid double-streaming.
+  const disableBlockStreamingForDraft = draftStream ? true : undefined;
+
   const { dispatcher, replyOptions, markDispatchIdle } = createReplyDispatcherWithTyping({
     ...prefixOptions,
     humanDelay: resolveHumanDelayConfig(cfg, route.agentId),
     deliver: async (payload: ReplyPayload) => {
+      if (draftStream) {
+        const hasMedia = Boolean(payload.mediaUrl) || (payload.mediaUrls?.length ?? 0) > 0;
+        const finalText = payload.text;
+        const previewMessageId = draftStream.messageId();
+
+        // Try to finalize via preview edit (text-only, fits in 2000 chars, not an error)
+        const canFinalizeViaPreviewEdit =
+          !finalizedViaPreviewMessage &&
+          !hasMedia &&
+          typeof finalText === "string" &&
+          finalText.length > 0 &&
+          typeof previewMessageId === "string" &&
+          finalText.length <= draftMaxChars &&
+          !payload.isError;
+
+        if (canFinalizeViaPreviewEdit) {
+          await draftStream.stop();
+          try {
+            await editMessageDiscord(deliverChannelId, previewMessageId, {
+              content: finalText,
+            }, { rest: client.rest });
+            finalizedViaPreviewMessage = true;
+            replyReference.markSent();
+            return;
+          } catch (err) {
+            logVerbose(
+              `discord: preview final edit failed; falling back to standard send (${String(err)})`,
+            );
+          }
+        }
+
+        // Check if stop() flushed a message we can edit
+        if (!finalizedViaPreviewMessage) {
+          await draftStream.stop();
+          const messageIdAfterStop = draftStream.messageId();
+          if (
+            typeof messageIdAfterStop === "string" &&
+            typeof finalText === "string" &&
+            finalText.length > 0 &&
+            finalText.length <= draftMaxChars &&
+            !hasMedia &&
+            !payload.isError
+          ) {
+            try {
+              await editMessageDiscord(deliverChannelId, messageIdAfterStop, {
+                content: finalText,
+              }, { rest: client.rest });
+              finalizedViaPreviewMessage = true;
+              replyReference.markSent();
+              return;
+            } catch (err) {
+              logVerbose(
+                `discord: post-stop preview edit failed; falling back to standard send (${String(err)})`,
+              );
+            }
+          }
+        }
+
+        // Clear the preview and fall through to standard delivery
+        if (!finalizedViaPreviewMessage) {
+          await draftStream.clear();
+        }
+      }
+
       const replyToId = replyReference.use();
       await deliverDiscordReply({
         replies: [payload],
@@ -647,9 +772,16 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
         ...replyOptions,
         skillFilter: channelConfig?.skills,
         disableBlockStreaming:
-          typeof discordConfig?.blockStreaming === "boolean"
+          disableBlockStreamingForDraft ??
+          (typeof discordConfig?.blockStreaming === "boolean"
             ? !discordConfig.blockStreaming
-            : undefined,
+            : undefined),
+        onPartialReply: draftStream ? (payload) => updateDraftFromPartial(payload.text) : undefined,
+        onAssistantMessageStart: draftStream
+          ? () => {
+              lastPartialText = "";
+            }
+          : undefined,
         onModelSelected,
         onReasoningStream: async () => {
           await statusReactions.setThinking();
@@ -663,6 +795,11 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
     dispatchError = true;
     throw err;
   } finally {
+    // Must stop() first to flush debounced content before clear() wipes state
+    await draftStream?.stop();
+    if (!finalizedViaPreviewMessage) {
+      await draftStream?.clear();
+    }
     markDispatchIdle();
     if (statusReactionsEnabled) {
       if (dispatchError) {

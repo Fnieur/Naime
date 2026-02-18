@@ -7,6 +7,8 @@ import type {
   OutboundRetryConfig,
   ReplyToMode,
 } from "./types.base.js";
+
+export type DiscordStreamMode = "partial" | "off";
 import type { ChannelHeartbeatVisibilityConfig } from "./types.channels.js";
 import type { DmConfig, ProviderCommandsConfig } from "./types.messages.js";
 import type { GroupToolPolicyBySenderConfig, GroupToolPolicyConfig } from "./types.tools.js";
@@ -153,6 +155,13 @@ export type DiscordAccountConfig = {
   chunkMode?: "length" | "newline";
   /** Disable block streaming for this account. */
   blockStreaming?: boolean;
+  /**
+   * Live preview streaming mode (edit-based, like Telegram).
+   * - "partial": send a message and continuously edit it with new content as tokens arrive.
+   * - "off": no preview streaming (default).
+   * When enabled, block streaming is automatically suppressed to avoid double-streaming.
+   */
+  streamMode?: DiscordStreamMode;
   /** Merge streamed block replies before sending. */
   blockStreamingCoalesce?: BlockStreamingCoalesceConfig;
   /**
