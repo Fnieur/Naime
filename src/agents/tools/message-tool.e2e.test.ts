@@ -184,7 +184,7 @@ describe("message tool schema scoping", () => {
     const actionEnum = (properties.action as { enum?: string[] } | undefined)?.enum ?? [];
 
     expect(properties.components).toBeDefined();
-    expect(properties.buttons).toBeUndefined();
+    expect(properties.buttons).toBeDefined();
     expect(actionEnum).toContain("send");
     expect(actionEnum).toContain("poll");
     expect(actionEnum).not.toContain("react");

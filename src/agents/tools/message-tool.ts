@@ -3,7 +3,6 @@ import { BLUEBUBBLES_GROUP_ACTIONS } from "../../channels/plugins/bluebubbles-ac
 import {
   listChannelMessageActions,
   supportsChannelMessageButtons,
-  supportsChannelMessageButtonsForChannel,
   supportsChannelMessageCards,
   supportsChannelMessageCardsForChannel,
 } from "../../channels/plugins/message-actions.js";
@@ -472,9 +471,9 @@ function buildMessageToolSchema(params: {
 }) {
   const currentChannel = normalizeMessageChannel(params.currentChannelProvider);
   const actions = resolveMessageToolSchemaActions(params);
-  const includeButtons = currentChannel
-    ? supportsChannelMessageButtonsForChannel({ cfg: params.cfg, channel: currentChannel })
-    : supportsChannelMessageButtons(params.cfg);
+  // Keep Telegram inline button fields available even when the tool is scoped
+  // to another channel (for example, cross-channel sends with `channel=telegram`).
+  const includeButtons = supportsChannelMessageButtons(params.cfg);
   const includeCards = currentChannel
     ? supportsChannelMessageCardsForChannel({ cfg: params.cfg, channel: currentChannel })
     : supportsChannelMessageCards(params.cfg);
