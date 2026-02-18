@@ -36,7 +36,7 @@ describe("mattermost reactions", () => {
         });
       }
       throw new Error(`unexpected url: ${url}`);
-    });
+    }) as unknown as typeof fetch;
 
     const result = await addMattermostReaction({
       cfg: createCfg(),
@@ -64,7 +64,7 @@ describe("mattermost reactions", () => {
         });
       }
       throw new Error(`unexpected url: ${url}`);
-    });
+    }) as unknown as typeof fetch;
 
     const result = await addMattermostReaction({
       cfg: createCfg(),
@@ -95,7 +95,7 @@ describe("mattermost reactions", () => {
         });
       }
       throw new Error(`unexpected url: ${url}`);
-    });
+    }) as unknown as typeof fetch;
 
     const result = await removeMattermostReaction({
       cfg: createCfg(),
