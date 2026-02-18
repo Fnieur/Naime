@@ -28,6 +28,7 @@ export const TOOL_GROUPS: Record<string, string[]> = {
     "sessions_spawn",
     "subagents",
     "session_status",
+    "dialog",
   ],
   // UI helpers
   "group:ui": ["browser", "canvas"],
@@ -57,6 +58,7 @@ export const TOOL_GROUPS: Record<string, string[]> = {
     "web_search",
     "web_fetch",
     "image",
+    "dialog",
   ],
 };
 

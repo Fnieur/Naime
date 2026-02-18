@@ -56,6 +56,7 @@ import { createChannelManager } from "./server-channels.js";
 import { createAgentEventHandler } from "./server-chat.js";
 import { createGatewayCloseHandler } from "./server-close.js";
 import { buildGatewayCronService } from "./server-cron.js";
+import { createDialogSessionTracker } from "./server-dialog-sessions.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
@@ -325,6 +326,7 @@ export async function startGatewayServer(
 
   const wizardRunner = opts.wizardRunner ?? runOnboardingWizard;
   const { wizardSessions, findRunningWizard, purgeWizardSession } = createWizardSessionTracker();
+  const { dialogManager } = createDialogSessionTracker();
 
   const deps = createDefaultDeps();
   let canvasHostServer: CanvasHostServer | null = null;
@@ -555,12 +557,14 @@ export async function startGatewayServer(
     extraHandlers: {
       ...pluginRegistry.gatewayHandlers,
       ...execApprovalHandlers,
+      ...(await import("./server-methods/dialog.js")).dialogHandlers,
     },
     broadcast,
     context: {
       deps,
       cron,
       cronStorePath,
+      dialogManager,
       execApprovalManager,
       loadGatewayModelCatalog,
       getHealthCache,

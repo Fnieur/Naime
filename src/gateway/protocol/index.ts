@@ -101,6 +101,14 @@ import {
   DeviceTokenRevokeParamsSchema,
   type DeviceTokenRotateParams,
   DeviceTokenRotateParamsSchema,
+  type DialogStartParams,
+  DialogStartParamsSchema,
+  type DialogAnswerParams,
+  DialogAnswerParamsSchema,
+  type DialogCancelParams,
+  DialogCancelParamsSchema,
+  type DialogStatusParams,
+  DialogStatusParamsSchema,
   type ExecApprovalsGetParams,
   ExecApprovalsGetParamsSchema,
   type ExecApprovalsNodeGetParams,
@@ -303,6 +311,10 @@ export const validateWizardStartParams = ajv.compile<WizardStartParams>(WizardSt
 export const validateWizardNextParams = ajv.compile<WizardNextParams>(WizardNextParamsSchema);
 export const validateWizardCancelParams = ajv.compile<WizardCancelParams>(WizardCancelParamsSchema);
 export const validateWizardStatusParams = ajv.compile<WizardStatusParams>(WizardStatusParamsSchema);
+export const validateDialogStartParams = ajv.compile<DialogStartParams>(DialogStartParamsSchema);
+export const validateDialogAnswerParams = ajv.compile<DialogAnswerParams>(DialogAnswerParamsSchema);
+export const validateDialogCancelParams = ajv.compile<DialogCancelParams>(DialogCancelParamsSchema);
+export const validateDialogStatusParams = ajv.compile<DialogStatusParams>(DialogStatusParamsSchema);
 export const validateTalkModeParams = ajv.compile<TalkModeParams>(TalkModeParamsSchema);
 export const validateTalkConfigParams = ajv.compile<TalkConfigParams>(TalkConfigParamsSchema);
 export const validateChannelsStatusParams = ajv.compile<ChannelsStatusParams>(
@@ -443,6 +455,10 @@ export {
   ConfigPatchParamsSchema,
   ConfigSchemaParamsSchema,
   ConfigSchemaResponseSchema,
+  DialogStartParamsSchema,
+  DialogAnswerParamsSchema,
+  DialogCancelParamsSchema,
+  DialogStatusParamsSchema,
   WizardStartParamsSchema,
   WizardNextParamsSchema,
   WizardCancelParamsSchema,
@@ -531,6 +547,10 @@ export type {
   ConfigPatchParams,
   ConfigSchemaParams,
   ConfigSchemaResponse,
+  DialogStartParams,
+  DialogAnswerParams,
+  DialogCancelParams,
+  DialogStatusParams,
   WizardStartParams,
   WizardNextParams,
   WizardCancelParams,

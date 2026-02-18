@@ -354,6 +354,20 @@ export async function applySessionsPatchToStore(params: {
     }
   }
 
+  if ("activeDialogId" in patch) {
+    const raw = (patch as Record<string, unknown>).activeDialogId;
+    if (raw === null || raw === undefined) {
+      delete next.activeDialogId;
+    } else if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (trimmed) {
+        next.activeDialogId = trimmed;
+      } else {
+        delete next.activeDialogId;
+      }
+    }
+  }
+
   store[storeKey] = next;
   return { ok: true, entry: next };
 }

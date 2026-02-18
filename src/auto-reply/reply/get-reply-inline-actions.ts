@@ -15,6 +15,7 @@ import type { ElevatedLevel, ReasoningLevel, ThinkLevel, VerboseLevel } from "..
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { getAbortMemory } from "./abort.js";
 import { buildStatusReply, handleCommands } from "./commands.js";
+import { checkActiveDialog } from "./dialog-intercept.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import { isDirectiveOnly } from "./directive-handling.js";
 import type { createModelSelectionState } from "./model-selection.js";
@@ -161,6 +162,17 @@ export async function handleInlineActions(params: {
 
   let directives = initialDirectives;
   let cleanedBody = initialCleanedBody;
+
+  // Check for active dialog before any other processing
+  const dialogCheck = await checkActiveDialog({
+    sessionKey,
+    sessionEntry,
+    cleanedBody,
+  });
+  if (dialogCheck) {
+    typing.cleanup();
+    return { kind: "reply", reply: dialogCheck.reply };
+  }
 
   const slashCommandName = resolveSlashCommandName(command.commandBodyNormalized);
   const shouldLoadSkillCommands =

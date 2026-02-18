@@ -101,6 +101,7 @@ export type SessionEntry = {
   lastThreadId?: string | number;
   skillsSnapshot?: SessionSkillSnapshot;
   systemPromptReport?: SessionSystemPromptReport;
+  activeDialogId?: string;
 };
 
 export function mergeSessionEntry(
