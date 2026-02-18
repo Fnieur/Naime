@@ -760,6 +760,8 @@ Periodic heartbeat runs.
           systemPrompt: "Session nearing compaction. Store durable memories now.",
           prompt: "Write any lasting notes to memory/YYYY-MM-DD.md; reply with NO_REPLY if nothing to store.",
         },
+        customInstructions: "Preserve all tool configuration details and API keys references.",
+        model: "anthropic/claude-sonnet-4-5",
       },
     },
   },
@@ -768,6 +770,8 @@ Periodic heartbeat runs.
 
 - `mode`: `default` or `safeguard` (chunked summarization for long histories). See [Compaction](/concepts/compaction).
 - `memoryFlush`: silent agentic turn before auto-compaction to store durable memories. Skipped when workspace is read-only.
+- `customInstructions`: extra instructions appended to the compaction summary prompt (e.g. what to preserve or emphasize).
+- `model`: override model used for compaction summaries (format: `"provider/model"`). Falls back to the session model when unset.
 
 ### `agents.defaults.contextPruning`
 

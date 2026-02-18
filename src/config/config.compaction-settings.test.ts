@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.js";
 import { withTempHome } from "./test-helpers.js";
 
@@ -42,6 +42,40 @@ describe("config compaction settings", () => {
       expect(cfg.agents?.defaults?.compaction?.memoryFlush?.softThresholdTokens).toBe(1234);
       expect(cfg.agents?.defaults?.compaction?.memoryFlush?.prompt).toBe("Write notes.");
       expect(cfg.agents?.defaults?.compaction?.memoryFlush?.systemPrompt).toBe("Flush memory now.");
+    });
+  });
+
+  it("preserves customInstructions and model config values", async () => {
+    await withTempHome(async (home) => {
+      const configDir = path.join(home, ".openclaw");
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(
+        path.join(configDir, "openclaw.json"),
+        JSON.stringify(
+          {
+            agents: {
+              defaults: {
+                compaction: {
+                  customInstructions: "Always include tool call summaries.",
+                  model: "openai/gpt-4o-mini",
+                },
+              },
+            },
+          },
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+
+      vi.resetModules();
+      const { loadConfig } = await import("./config.js");
+      const cfg = loadConfig();
+
+      expect(cfg.agents?.defaults?.compaction?.customInstructions).toBe(
+        "Always include tool call summaries.",
+      );
+      expect(cfg.agents?.defaults?.compaction?.model).toBe("openai/gpt-4o-mini");
     });
   });
 
