@@ -25,6 +25,7 @@ import type { ModelAuthMode } from "./model-auth.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
 import { wrapToolWithAbortSignal } from "./pi-tools.abort.js";
 import { wrapToolWithBeforeToolCallHook } from "./pi-tools.before-tool-call.js";
+import { wrapToolWithCautionAudit } from "./pi-tools.caution-audit.js";
 import {
   isToolAllowedByPolicies,
   resolveEffectiveToolPolicy,
@@ -202,6 +203,8 @@ export function createOpenClawCodingTools(options?: {
   senderId?: string | null;
   senderName?: string | null;
   senderUsername?: string | null;
+  /** Caution context for intent-aware audit. */
+  cautionContext?: import("../security/caution-context.js").CautionContext;
   senderE164?: string | null;
   /** Reply-to mode for Slack auto-threading. */
   replyToMode?: "off" | "first" | "all";
@@ -494,9 +497,12 @@ export function createOpenClawCodingTools(options?: {
       loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
     }),
   );
-  const withAbort = options?.abortSignal
-    ? withHooks.map((tool) => wrapToolWithAbortSignal(tool, options.abortSignal))
+  const withCaution = options?.cautionContext
+    ? withHooks.map((tool) => wrapToolWithCautionAudit(tool, options.cautionContext))
     : withHooks;
+  const withAbort = options?.abortSignal
+    ? withCaution.map((tool) => wrapToolWithAbortSignal(tool, options.abortSignal))
+    : withCaution;
 
   // NOTE: Keep canonical (lowercase) tool names here.
   // pi-ai's Anthropic OAuth transport remaps tool names to Claude Code-style names
