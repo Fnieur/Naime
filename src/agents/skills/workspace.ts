@@ -680,6 +680,8 @@ export function buildWorkspaceSkillCommandSpecs(
     skillFilter?: string[];
     eligibility?: SkillEligibilityContext;
     reservedNames?: Set<string>;
+    /** How to handle duplicate skill command names across agents */
+    deduplicationMode?: "number" | "skip";
   },
 ): SkillCommandSpec[] {
   const skillEntries = opts?.entries ?? loadSkillEntries(workspaceDir, opts);
@@ -694,6 +696,7 @@ export function buildWorkspaceSkillCommandSpecs(
   for (const reserved of opts?.reservedNames ?? []) {
     used.add(reserved.toLowerCase());
   }
+  const dedupeMode = opts?.deduplicationMode ?? "number";
 
   const specs: SkillCommandSpec[] = [];
   for (const entry of userInvocable) {
@@ -705,6 +708,16 @@ export function buildWorkspaceSkillCommandSpecs(
         `Sanitized skill command name "${rawName}" to "/${base}".`,
         { rawName, sanitized: `/${base}` },
       );
+    }
+    // Check for duplicates before generating unique name
+    const normalizedBase = base.toLowerCase();
+    if (used.has(normalizedBase) && dedupeMode === "skip") {
+      debugSkillCommandOnce(
+        `skip:${rawName}`,
+        `Skipping skill command "/${base}" for "${rawName}" - conflicts with existing command (deduplicationMode: skip).`,
+        { rawName, skippedCommand: `/${base}` },
+      );
+      continue;
     }
     const unique = resolveUniqueSkillCommandName(base, used);
     if (unique !== base) {
