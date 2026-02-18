@@ -131,6 +131,7 @@ export function attachGatewayWsMessageHandler(params: {
 
   const configSnapshot = loadConfig();
   const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+  const localNetworks = configSnapshot.gateway?.localNetworks ?? [];
   const clientIp = resolveGatewayClientIp({ remoteAddr, forwardedFor, realIp, trustedProxies });
 
   // If proxy headers are present but the remote address isn't trusted, don't treat
@@ -144,7 +145,7 @@ export function attachGatewayWsMessageHandler(params: {
   const hostIsLocal = hostName === "localhost" || hostName === "127.0.0.1" || hostName === "::1";
   const hostIsTailscaleServe = hostName.endsWith(".ts.net");
   const hostIsLocalish = hostIsLocal || hostIsTailscaleServe;
-  const isLocalClient = isLocalDirectRequest(upgradeReq, trustedProxies);
+  const isLocalClient = isLocalDirectRequest(upgradeReq, trustedProxies, localNetworks);
   const reportedClientIp =
     isLocalClient || hasUntrustedProxyHeaders
       ? undefined
@@ -351,6 +352,7 @@ export function attachGatewayWsMessageHandler(params: {
           connectAuth: connectParams.auth,
           req: upgradeReq,
           trustedProxies,
+          localNetworks,
           rateLimiter: hasDeviceTokenCandidate ? undefined : rateLimiter,
           clientIp,
           rateLimitScope: AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
@@ -384,6 +386,7 @@ export function attachGatewayWsMessageHandler(params: {
               connectAuth: connectParams.auth,
               req: upgradeReq,
               trustedProxies,
+              localNetworks,
               // Shared-auth probe only; rate-limit side effects are handled in
               // the primary auth flow (or deferred for device-token candidates).
               rateLimitScope: AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,

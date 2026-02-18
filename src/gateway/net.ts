@@ -227,6 +227,27 @@ export function isTrustedProxyAddress(ip: string | undefined, trustedProxies?: s
   });
 }
 
+/**
+ * Check if an IP belongs to a configured local network.
+ * Used by auto-pairing to determine if a client is "local" without
+ * trusting all private RFC1918 ranges.
+ */
+export function isLocalNetworkAddress(ip: string | undefined, localNetworks?: string[]): boolean {
+  if (!localNetworks || localNetworks.length === 0) {
+    return false;
+  }
+  const normalized = normalizeIp(ip);
+  if (!normalized) {
+    return false;
+  }
+  return localNetworks.some((network) => {
+    if (network.includes("/")) {
+      return ipMatchesCIDR(normalized, network);
+    }
+    return normalizeIp(network) === normalized;
+  });
+}
+
 export function resolveGatewayClientIp(params: {
   remoteAddr?: string;
   forwardedFor?: string;

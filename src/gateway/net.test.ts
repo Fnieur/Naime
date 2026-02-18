@@ -1,6 +1,7 @@
 import os from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  isLocalNetworkAddress,
   isPrivateOrLoopbackAddress,
   isTrustedProxyAddress,
   pickPrimaryLanIPv4,
@@ -235,5 +236,48 @@ describe("isPrivateOrLoopbackAddress", () => {
     for (const ip of rejected) {
       expect(isPrivateOrLoopbackAddress(ip)).toBe(false);
     }
+  });
+});
+
+describe("isLocalNetworkAddress", () => {
+  it("returns false when no local networks configured", () => {
+    expect(isLocalNetworkAddress("172.17.0.2", undefined)).toBe(false);
+    expect(isLocalNetworkAddress("172.17.0.2", [])).toBe(false);
+  });
+
+  it("matches IPs within a configured CIDR subnet", () => {
+    const networks = ["172.17.0.0/16"];
+    expect(isLocalNetworkAddress("172.17.0.2", networks)).toBe(true);
+    expect(isLocalNetworkAddress("172.17.255.254", networks)).toBe(true);
+  });
+
+  it("rejects IPs outside the configured subnet", () => {
+    const networks = ["172.17.0.0/16"];
+    expect(isLocalNetworkAddress("172.18.0.1", networks)).toBe(false);
+    expect(isLocalNetworkAddress("10.0.0.1", networks)).toBe(false);
+    expect(isLocalNetworkAddress("192.168.1.1", networks)).toBe(false);
+  });
+
+  it("supports exact IP entries alongside CIDRs", () => {
+    const networks = ["172.17.0.0/16", "10.42.0.5"];
+    expect(isLocalNetworkAddress("10.42.0.5", networks)).toBe(true);
+    expect(isLocalNetworkAddress("10.42.0.6", networks)).toBe(false);
+    expect(isLocalNetworkAddress("172.17.5.10", networks)).toBe(true);
+  });
+
+  it("supports multiple CIDR ranges", () => {
+    const networks = ["172.17.0.0/16", "10.42.0.0/24"];
+    expect(isLocalNetworkAddress("172.17.0.2", networks)).toBe(true);
+    expect(isLocalNetworkAddress("10.42.0.59", networks)).toBe(true);
+    expect(isLocalNetworkAddress("10.42.1.1", networks)).toBe(false);
+  });
+
+  it("handles IPv4-mapped IPv6 addresses", () => {
+    const networks = ["172.17.0.0/16"];
+    expect(isLocalNetworkAddress("::ffff:172.17.0.2", networks)).toBe(true);
+  });
+
+  it("returns false for undefined IP", () => {
+    expect(isLocalNetworkAddress(undefined, ["172.17.0.0/16"])).toBe(false);
   });
 });

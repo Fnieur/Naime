@@ -310,6 +310,16 @@ export type GatewayConfig = {
    * `x-real-ip`) to determine the client IP for local pairing and HTTP checks.
    */
   trustedProxies?: string[];
+  /**
+   * Subnets (CIDR notation) or IPs to treat as "local" for auto-pairing.
+   * By default only loopback addresses (127.0.0.0/8, ::1) are considered local.
+   * Use this for Docker bridge networks, Kubernetes pod CIDRs, or other
+   * container orchestration setups where the gateway is accessed from a
+   * private subnet on the same host.
+   *
+   * Example: ["172.17.0.0/16"] for Docker's default bridge network.
+   */
+  localNetworks?: string[];
   /** Tool access restrictions for HTTP /tools/invoke endpoint. */
   tools?: GatewayToolsConfig;
   /**

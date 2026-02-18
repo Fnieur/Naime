@@ -110,11 +110,12 @@ async function authorizeCanvasRequest(params: {
   req: IncomingMessage;
   auth: ResolvedGatewayAuth;
   trustedProxies: string[];
+  localNetworks: string[];
   clients: Set<GatewayWsClient>;
   rateLimiter?: AuthRateLimiter;
 }): Promise<GatewayAuthResult> {
-  const { req, auth, trustedProxies, clients, rateLimiter } = params;
-  if (isLocalDirectRequest(req, trustedProxies)) {
+  const { req, auth, trustedProxies, localNetworks, clients, rateLimiter } = params;
+  if (isLocalDirectRequest(req, trustedProxies, localNetworks)) {
     return { ok: true };
   }
 
@@ -126,6 +127,7 @@ async function authorizeCanvasRequest(params: {
       connectAuth: { token, password: token },
       req,
       trustedProxies,
+      localNetworks,
       rateLimiter,
     });
     if (authResult.ok) {
@@ -482,6 +484,7 @@ export function createGatewayHttpServer(opts: {
     try {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+      const localNetworks = configSnapshot.gateway?.localNetworks ?? [];
       const requestPath = new URL(req.url ?? "/", "http://localhost").pathname;
       if (await handleHooksRequest(req, res)) {
         return;
@@ -509,6 +512,7 @@ export function createGatewayHttpServer(opts: {
             connectAuth: token ? { token, password: token } : null,
             req,
             trustedProxies,
+            localNetworks,
             rateLimiter,
           });
           if (!authResult.ok) {
@@ -549,6 +553,7 @@ export function createGatewayHttpServer(opts: {
             req,
             auth: resolvedAuth,
             trustedProxies,
+            localNetworks,
             clients,
             rateLimiter,
           });
@@ -614,10 +619,12 @@ export function attachGatewayUpgradeHandler(opts: {
         if (url.pathname === CANVAS_WS_PATH) {
           const configSnapshot = loadConfig();
           const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+          const localNetworks = configSnapshot.gateway?.localNetworks ?? [];
           const ok = await authorizeCanvasRequest({
             req,
             auth: resolvedAuth,
             trustedProxies,
+            localNetworks,
             clients,
             rateLimiter,
           });
