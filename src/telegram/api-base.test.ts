@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, symlink, mkdir } from "node:fs/promises";
+import { mkdtemp, realpath, writeFile, symlink, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -109,7 +109,8 @@ describe("validateLocalFilePath", () => {
   let baseDir: string;
 
   beforeEach(async () => {
-    baseDir = await mkdtemp(nodePath.join(tmpdir(), "tg-api-test-"));
+    // Resolve to canonical path so Windows 8.3 short names don't mismatch realpath results.
+    baseDir = await realpath(await mkdtemp(nodePath.join(tmpdir(), "tg-api-test-")));
     await mkdir(nodePath.join(baseDir, "subdir"), { recursive: true });
   });
 

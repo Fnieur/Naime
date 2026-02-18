@@ -62,13 +62,14 @@ export async function validateLocalFilePath(
       "localApiDataDir must be configured when using a local Bot API server with disk reads",
     );
   }
-  const baseDir = nodePath.resolve(allowedDir.trim());
-  // Resolve symlinks + normalise ".." segments.
+  // Resolve symlinks on both sides so Windows 8.3 short names (e.g.
+  // RUNNER~1) don't cause a false mismatch against the long-form realpath.
+  const resolvedBase = await realpath(nodePath.resolve(allowedDir.trim()));
   const real = await realpath(filePath);
-  const normalBase = baseDir.endsWith("/") ? baseDir : `${baseDir}/`;
-  if (!real.startsWith(normalBase) && real !== baseDir) {
+  const normalBase = resolvedBase.endsWith("/") ? resolvedBase : `${resolvedBase}/`;
+  if (!real.startsWith(normalBase) && real !== resolvedBase) {
     throw new Error(
-      `Local Bot API file path escapes allowed directory: ${filePath} resolved to ${real} (allowed: ${baseDir})`,
+      `Local Bot API file path escapes allowed directory: ${filePath} resolved to ${real} (allowed: ${resolvedBase})`,
     );
   }
   return real;
