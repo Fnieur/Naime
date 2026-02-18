@@ -16,11 +16,19 @@ export type CallManagerRuntimeState = {
   rejectedProviderCallIds: Set<string>;
 };
 
+export type Logger = {
+  info: (message: string) => void;
+  warn: (message: string) => void;
+  error: (message: string) => void;
+  debug?: (message: string) => void;
+};
+
 export type CallManagerRuntimeDeps = {
   provider: VoiceCallProvider | null;
   config: VoiceCallConfig;
   storePath: string;
   webhookUrl: string | null;
+  logger: Logger;
 };
 
 export type CallManagerTransientState = {
