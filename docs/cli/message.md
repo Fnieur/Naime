@@ -64,11 +64,12 @@ Name lookup:
   - WhatsApp only: `--gif-playback`
 
 - `poll`
-  - Channels: WhatsApp/Telegram/Discord/Matrix/MS Teams
+  - Channels: WhatsApp/Telegram/Discord/Matrix/MS Teams/Signal
   - Required: `--target`, `--poll-question`, `--poll-option` (repeat)
   - Optional: `--poll-multi`
   - Discord only: `--poll-duration-hours`, `--silent`, `--message`
   - Telegram only: `--poll-duration-seconds` (5-600), `--silent`, `--poll-anonymous` / `--poll-public`, `--thread-id`
+  - Signal: creates a poll via `sendPollCreate` RPC
 
 - `react`
   - Channels: Discord/Google Chat/Slack/Telegram/WhatsApp/Signal
@@ -96,6 +97,15 @@ Name lookup:
 - `delete`
   - Channels: Discord/Slack/Telegram
   - Required: `--message-id`, `--target`
+
+- Signal message tool actions (not `openclaw message <subcommand>`):
+  - `unsend`: delete a message you sent
+    - `openclaw message action=unsend channel=signal target=+15551234567 messageId=1737630212345`
+  - `pollVote`: vote in a Signal poll
+    - `openclaw message action=pollVote channel=signal target=signal:group:<groupId> messageId=1737630212345 targetAuthor=uuid:<creator-uuid> pollOption=["0","2"]`
+    - `pollOption` is `string[]` (0-indexed option indexes as strings). Numeric indexes are also accepted and coerced.
+  - `pollClose`: close a Signal poll (only the poll creator can close)
+    - `openclaw message action=pollClose channel=signal target=signal:group:<groupId> messageId=1737630212345`
 
 - `pin` / `unpin`
   - Channels: Discord/Slack
@@ -235,6 +245,16 @@ openclaw message poll --channel msteams \
   --target conversation:19:abc@thread.tacv2 \
   --poll-question "Lunch?" \
   --poll-option Pizza --poll-option Sushi
+```
+
+Create a Signal poll:
+
+```
+openclaw message poll --channel signal \
+  --target +15551234567 \
+  --poll-question "Lunch?" \
+  --poll-option Pizza --poll-option Sushi \
+  --poll-multi
 ```
 
 React in Slack:
